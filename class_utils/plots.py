@@ -5,6 +5,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+from .utils import corr, mask_corr_significance
 
 def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
                     with_error=True, 
@@ -83,4 +84,22 @@ def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
         )
 
     ax.grid(ls='--')
+
+def corr_heatmap(data_frame, p_bound=0.01, ax=None):
+    if ax is None:
+        ax = plt.gca()
+
+    if p_bound is None:
+        r = data_frame.corr()
+        sns.heatmap(r, ax=ax, center=0, square=True, linewidths=1)
+        ax.xaxis.set_tick_params(rotation=45)
+        plt.setp(ax.get_xticklabels(),
+            rotation_mode="anchor", horizontalalignment="right")
+    else:
+        r, p = corr(data_frame)
+        mask_corr_significance(r, p, p_bound)
+        sns.heatmap(r, ax=ax, center=0, square=True, linewidths=1)
+        ax.xaxis.set_tick_params(rotation=45)
+        plt.setp(ax.get_xticklabels(),
+            rotation_mode="anchor", horizontalalignment="right")
 
