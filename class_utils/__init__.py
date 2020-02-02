@@ -3,4 +3,4 @@
 VERSION = "0.1"
 
 from .plots import error_histogram, corr_heatmap
-
+from .explain import show_tree, Explainer
