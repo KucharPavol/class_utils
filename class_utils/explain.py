@@ -6,6 +6,7 @@ import graphviz
 
 from sklearn.compose import make_column_transformer
 from sklearn.pipeline import make_pipeline
+from sklearn.base import is_classifier
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -34,7 +35,8 @@ class Explainer:
          numeric_inputs,
          numeric_imputer,
          input_preproc,
-         class_names
+         class_names=None,
+         **kwargs
     ): 
         """
         Args:
@@ -95,8 +97,9 @@ class Explainer:
             feature_names=categorical_inputs+numeric_inputs,
             class_names=class_names,
             categorical_features=range(len(categorical_inputs)),
-            categorical_names=cat_name_idx, 
-            kernel_width=3
+            categorical_names=cat_name_idx,
+            mode="classification" if is_classifier(self.model) else "regression",
+            **kwargs
         )
         
         self.full_model = make_pipeline(
@@ -126,7 +129,8 @@ class Explainer:
         
         return self.explainer.explain_instance(
             x_inst,
-            self.full_model.predict_proba
+            self.full_model.predict_proba if hasattr(self.full_model, 'predict_proba')
+                else self.full_model.predict
         )
     
     def pdp_plot(self, df_inputs, feature_name, **kwargs):
