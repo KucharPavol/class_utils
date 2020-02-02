@@ -5,7 +5,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from .utils import corr, mask_corr_significance
+from .corr import corr, mask_corr_significance
 
 def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
                     with_error=True, 
