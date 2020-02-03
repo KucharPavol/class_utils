@@ -54,6 +54,7 @@ class Explainer:
         self.numeric_inputs = numeric_inputs
         self.numeric_imputer = numeric_imputer
         self.input_preproc = input_preproc
+        class_names = [str(c) for c in class_names]
         
         self.interpret_preproc = make_column_transformer(
             (make_pipeline(
