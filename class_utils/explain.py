@@ -15,7 +15,8 @@ from sklearn.preprocessing import FunctionTransformer, OrdinalEncoder
 from pdpbox import pdp, get_dataset, info_plots
 import eli5
 
-def show_tree(model, feature_names=None, class_names=None):    
+def show_tree(model, feature_names=None, class_names=None,
+              save2fpath=None, return_graph=False):    
     graph = graphviz.Source(export_graphviz(
         model, impurity=False, filled=True,
         proportion=True, rounded=True,
@@ -24,7 +25,15 @@ def show_tree(model, feature_names=None, class_names=None):
         special_characters=True
     ))
     
-    display(Image(graph.pipe(format='png')))
+    img = graph.pipe(format='png')
+    display(Image(img))
+
+    if not save2fpath is None:
+        with open(save2fpath, 'wb') as file:
+            file.write(img)
+
+    if return_graph:
+        return graph
 
 class Explainer:
     def __init__(self,
