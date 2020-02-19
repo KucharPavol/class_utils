@@ -46,7 +46,8 @@ def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
     ax2 = ax.twinx()
 
     if with_output:
-        sns.distplot(Y_true, label="desired output", ax=ax1, color=output_color)
+        sns.distplot(Y_true, label="desired output", ax=ax1, color=output_color,
+            hist_kws=output_kwargs)
         ax1.set_xlabel('value')
         ax1.set_ylabel('output frequency', color=output_color)
         ax1.tick_params(axis='y', labelcolor=output_color)
