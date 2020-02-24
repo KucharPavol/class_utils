@@ -16,7 +16,8 @@ from pdpbox import pdp, get_dataset, info_plots
 import eli5
 
 def show_tree(model, feature_names=None, class_names=None,
-              save2fpath=None, return_graph=False):    
+              save2fpath=None, return_graph=False,
+              width=1000, height=None):    
     graph = graphviz.Source(export_graphviz(
         model, impurity=False, filled=True,
         proportion=True, rounded=True,
@@ -26,7 +27,7 @@ def show_tree(model, feature_names=None, class_names=None,
     ))
     
     img = graph.pipe(format='png')
-    display(Image(img))
+    display(Image(img, width=width, height=height))
 
     if not save2fpath is None:
         with open(save2fpath, 'wb') as file:
