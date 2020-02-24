@@ -2,5 +2,13 @@
 # -*- coding: utf-8 -*-
 VERSION = "0.1"
 
-from .plots import error_histogram, corr_heatmap
-from .explain import show_tree, Explainer
+try:
+    from .plots import error_histogram, corr_heatmap
+except ModuleNotFoundError:
+    pass
+
+try:
+    from .explain import show_tree, Explainer
+except ModuleNotFoundError:
+    pass
+
