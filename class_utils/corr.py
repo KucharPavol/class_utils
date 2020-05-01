@@ -5,7 +5,7 @@ from itertools import combinations
 import pandas as pd
 import numpy as np
 
-def corr(df):
+def corr(df, corr_method=pearsonr):
     """
     A routine with interface similar to df.corr(),
      which also returns a matrix of p-values.
@@ -13,12 +13,17 @@ def corr(df):
     df_r = pd.DataFrame(np.ones([df.shape[1], df.shape[1]]), columns=df.columns, index=df.columns)
     df_p = pd.DataFrame(np.zeros([df.shape[1], df.shape[1]]), columns=df.columns, index=df.columns)
     
-    for col1, col2 in combinations(df.columns, 2):        
-        r, p = pearsonr(df[col1], df[col2])
+    for col1, col2 in combinations(df.columns, 2):
+        # set up an index that will mask out NaNs and infinite numbers
+        col1_mask = np.isfinite(df[col1])
+        col2_mask = np.isfinite(df[col2])
+        index = np.where(np.logical_and(col1_mask, col2_mask))
+        # compute correlation on the masked columns
+        r, p = corr_method(df[col1].values[index], df[col2].values[index])
         df_r.loc[col1, col2] = r
         df_r.loc[col2, col1] = r
         df_p.loc[col1, col2] = p
-        df_p.loc[col2, col1] = p        
+        df_p.loc[col2, col1] = p
     
     return df_r, df_p
 
