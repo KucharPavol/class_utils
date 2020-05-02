@@ -86,20 +86,25 @@ def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
 
     ax.grid(ls='--')
 
-def corr_heatmap(data_frame, p_bound=0.01, ax=None, matplot_func=sns.heatmap):
+def corr_heatmap(data_frame, *args, p_bound=0.01, ax=None,
+                 matplot_func=sns.heatmap, **kwargs):
     if ax is None:
         ax = plt.gca()
 
+    default_kwargs = dict(center=0, square=True, linewidths=1)
+    default_kwargs.update(**kwargs)
+    kwargs = default_kwargs
+
     if p_bound is None:
         r = data_frame.corr()
-        matplot_func(r, ax=ax, center=0, square=True, linewidths=1)
+        matplot_func(r, *args, ax=ax, **kwargs)
         ax.xaxis.set_tick_params(rotation=45)
         plt.setp(ax.get_xticklabels(),
             rotation_mode="anchor", horizontalalignment="right")
     else:
         r, p = corr(data_frame)
         mask_corr_significance(r, p, p_bound)
-        matplot_func(r, ax=ax, center=0, square=True, linewidths=1)
+        matplot_func(r, *args, ax=ax, **kwargs)
         ax.xaxis.set_tick_params(rotation=45)
         plt.setp(ax.get_xticklabels(),
             rotation_mode="anchor", horizontalalignment="right")
