@@ -3,7 +3,9 @@
 VERSION = "0.1"
 
 try:
-    from .plots import error_histogram, corr_heatmap
+    from .plots import error_histogram, corr_heatmap, ColGrid, sorted_order
+    from .plots import crosstab_plot, heatmap_plot
+    from .utils import numpy_crosstab
 except ModuleNotFoundError:
     pass
 
