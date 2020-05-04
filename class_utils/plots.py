@@ -216,8 +216,8 @@ def sorted_order(func, by='median'):
     
     return wrapper
 
-def crosstab_plot(x, y, *args, **kwargs):
-    tab = numpy_crosstab(y, x)
+def crosstab_plot(x, y, dropna=False, shownan=False, *args, **kwargs):
+    tab = numpy_crosstab(y, x, dropna=dropna, shownan=shownan)
     return heatmap_plot(tab, *args, **kwargs)
 
 def heatmap_plot(
