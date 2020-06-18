@@ -93,7 +93,8 @@ def _maybe_extract(compressed_filename, directory, extension=None):
 
     if extension is None:
         basename = os.path.basename(compressed_filename)
-        extension = basename.split('.', 1)[1]
+        parts =  basename.split('.')
+        extension = parts[-1] if len(parts) > 1 else ""
 
     if 'zip' in extension:
         with zipfile.ZipFile(compressed_filename, "r") as zip_:
