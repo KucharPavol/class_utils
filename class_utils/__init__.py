@@ -10,7 +10,11 @@ except ModuleNotFoundError:
     pass
 
 try:
-    from .explain import show_tree, Explainer
+    from .explain import Explainer
 except ModuleNotFoundError:
     pass
 
+try:
+    from .graphs import show_tree
+except ModuleNotFoundError:
+    pass
