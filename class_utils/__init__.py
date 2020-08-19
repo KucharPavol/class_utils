@@ -18,3 +18,8 @@ try:
     from .graphs import show_tree
 except ModuleNotFoundError:
     pass
+
+try:
+    from .tensorboard import tflog2pandas
+except ModuleNotFoundError:
+    pass
