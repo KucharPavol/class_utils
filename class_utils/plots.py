@@ -279,3 +279,30 @@ def heatmap_plot(
         cax.set_yticklabels(ytick_labels)
 
     return mat
+
+def _groupby_propplot(x, y):
+    df = pd.concat([x, y], axis=1)
+    propby = df.groupby(x.name)[y.name].mean()
+    sns.barplot(propby.index, propby)
+
+def proportion_plot(df, x_col, prop_cols, show_titles=True):
+    scalar = False
+    
+    if isinstance(prop_cols, str):
+        prop_cols = [prop_cols]
+        scalar = True
+    
+    figs = []
+    
+    for prop_col in prop_cols:        
+        dumm = pd.get_dummies(df[prop_col])
+        dumm = dumm.rename(columns=lambda x: "{}={}".format(prop_col, x))
+        
+        dumm_df = pd.concat([df[x_col], dumm], axis=1)
+        g = ColGrid(dumm_df, "Sex", dumm.columns)
+        figs.append(g.map(_groupby_propplot))
+        
+    if scalar:
+        return figs[0]
+    else:
+        return figs
