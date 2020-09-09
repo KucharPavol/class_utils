@@ -3,6 +3,7 @@
 import itertools
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -11,6 +12,7 @@ from matplotlib.colors import LogNorm
 from seaborn.matrix import _DendrogramPlotter
 from .utils import numpy_crosstab
 import pandas as pd
+import numbers
 
 def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
                     with_error=True, 
@@ -306,3 +308,39 @@ def proportion_plot(df, x_col, prop_cols, show_titles=True):
         return figs[0]
     else:
         return figs
+
+def imscatter(x, y, images, ax=None, zoom=1,
+              frame_cmap=None, frame_c=None,
+              frame_linewidth=1, **kwargs):
+    if ax is None:
+        ax = plt.gca()
+        
+    if isinstance(frame_cmap, str):
+        frame_cmap = plt.cm.get_cmap(frame_cmap)
+    elif frame_cmap is None:
+        frame_cmap = plt.cm.get_cmap('jet')
+    
+    if len(images) == 1:
+        images = [images[0] for i in range(len(x))]
+        
+    if frame_c is None:
+        frame_c = ['k' for i in range(len(x))]
+
+    x, y = np.atleast_1d(x, y)
+    artists = []
+    
+    for i, (x0, y0) in enumerate(zip(x, y)):
+        fc = frame_c[i]
+        if isinstance(fc, numbers.Number):
+            fc = frame_cmap(fc)
+      
+        im = OffsetImage(images[i], zoom=zoom, **kwargs)
+        ab = AnnotationBbox(im, (x0, y0), xycoords='data', frameon=True,
+                            bboxprops=dict(edgecolor=fc,
+                                           linewidth=frame_linewidth))
+        artists.append(ax.add_artist(ab))
+        
+    ax.update_datalim(np.column_stack([x, y]))
+    ax.autoscale()
+    
+    return artists
