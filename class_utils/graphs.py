@@ -4,13 +4,15 @@ import graphviz
 
 def show_tree(model, feature_names=None, class_names=None,
               save2fpath=None, return_graph=False,
-              width=1000, height=None):
+              width=1000, height=None, impurity=False, filled=True,
+              proportion=True, rounded=True,
+              special_characters=True):
     graph = graphviz.Source(export_graphviz(
-        model, impurity=False, filled=True,
-        proportion=True, rounded=True,
+        model, impurity=impurity, filled=filled,
+        proportion=proportion, rounded=rounded,
         feature_names=feature_names,
         class_names=class_names,
-        special_characters=True
+        special_characters=special_characters
     ))
 
     img = graph.pipe(format='png')
