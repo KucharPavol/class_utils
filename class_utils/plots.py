@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import matplotlib.patches as patches
+from itertools import combinations
+import math
 import itertools
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -7,7 +10,7 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from .corr import corr, mask_corr_significance
+from .corr import corr, _num_cat_select
 from matplotlib.colors import LogNorm
 from seaborn.matrix import _DendrogramPlotter
 from .utils import numpy_crosstab
@@ -21,7 +24,7 @@ def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
                     error_color='tab:red', output_color='tab:blue',
                     error_kwargs=dict(alpha=0.8), output_kwargs={},
                     mae_kwargs=dict(c='k', ls='--'),
-                    mse_color=dict(c='k', ls='--'),
+                    mse_kwargs=dict(c='k', ls='--'),
                     standardize_outputs=True, ax=None,
                     num_label_precision=3):
     """
@@ -93,28 +96,299 @@ def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
 
     ax.grid(ls='--')
 
-def corr_heatmap(data_frame, *args, p_bound=0.01, ax=None,
-                 matplot_func=sns.heatmap, **kwargs):
+def _zaric_wrap_custom(source_text, separator_chars, width=70, keep_separators=True):
+    current_length = 0
+    latest_separator = -1
+    current_chunk_start = 0
+    output = ""
+    char_index = 0
+    while char_index < len(source_text):
+        if source_text[char_index] in separator_chars:
+            latest_separator = char_index
+        output += source_text[char_index]
+        current_length += 1
+        if current_length == width:
+            if latest_separator >= current_chunk_start:
+                # Valid earlier separator, cut there
+                cutting_length = char_index - latest_separator
+                if not keep_separators:
+                    cutting_length += 1
+                if cutting_length:
+                    output = output[:-cutting_length]
+                output += "\n"
+                current_chunk_start = latest_separator + 1
+                char_index = current_chunk_start
+            else:
+                # No separator found, hard cut
+                output += "\n"
+                current_chunk_start = char_index + 1
+                latest_separator = current_chunk_start - 1
+                char_index += 1
+            current_length = 0
+        else:
+            char_index += 1
+    return output
+
+def _zaric_heatmap(y, x, color=None, color_range=None,
+            palette='coolwarm', size=None, size_range=[0, 1], marker='s',
+            x_order=None, y_order=None, size_scale=None, circular=None,
+            ax=None, face_color='#fdfdfd'):
+
+    CORRELATION_ERROR = 83572398457329.0
+    CORRELATION_IDENTICAL = 1357239845732.0
+
+    if color is None:
+        color = [1]*len(x)
+
+    if circular is None:
+        circular = [False]*len(x)
+
+    if palette is None:
+        palette = []
+        n_colors = 256
+        for i in range(0,128):
+            palette.append( (0.85, (0.85/128)*i, (0.85/128)*i ))
+        for i in range(128,256):
+            palette.append( (0.85 - 0.85*(i-128.0)/128.0, 0.85 - 0.85*(i-128.0)/128.0, 0.85 ))
+    elif isinstance(palette, str):
+        n_colors = 256
+        palette = sns.color_palette(palette, n_colors=n_colors)
+    else:
+        n_colors = len(palette)
+
+    if color_range is None:
+        color_min, color_max = np.nanmin(color), np.nanmax(color)
+        color_max = np.maximum(np.abs(color_min), np.abs(color_max))
+        color_min = -color_max
+    else:    
+        color_min, color_max = color_range
+
+    def value_to_color(val):
+        if color_min == color_max:
+            return palette[-1]
+        else:
+            # For now, return "max positive" correlation color
+            if val == CORRELATION_IDENTICAL:
+                return palette[(n_colors - 1)]
+            if val == CORRELATION_ERROR:
+                return palette[(n_colors - 1)]
+            val_position = float((val - color_min)) / (color_max - color_min) # position of value in the input range, relative to the length of the input range
+            val_position = min(max(val_position, 0), 1) # bound the position betwen 0 and 1
+            # LOG IT
+            val_position = math.pow(val_position, 0.925)
+            ind = int(val_position * (n_colors - 1)) # target index in the color palette
+            return palette[ind]
+
+    if size is None:
+        size = [1]*len(x)
+
+    if size_range is None:
+        size_min, size_max = min(size), max(size)
+    else:
+        size_min, size_max = size_range[0], size_range[1]
+
+    if size_scale is None:
+        size_scale = 500
+
+    # Scale with num squares
+    size_scale = size_scale / len(x)
+    def value_to_size(val):
+        if val == 0:
+            return 0.0
+        if val == abs(CORRELATION_IDENTICAL):
+            return 1.0
+        # TODO: Better/more intuitive display of correlation errors
+        if val == abs(CORRELATION_ERROR):
+            return 0.0
+        if size_min == size_max:
+            return 1 * size_scale
+        else:
+            val_position = (val - size_min) * 0.999 / (size_max - size_min) + 0.001 # position of value in the input range, relative to the length of the input range
+            val_position = min(max(val_position, 0), 1) # bound the position betwen 0 and 1
+            # LOG IT
+            val_position = math.pow(val_position, 0.5)
+            return val_position
+
+    def do_wrapping(label, length):
+        return _zaric_wrap_custom(label, ["_", "-"], length)
+    wrap_x = 12 # at top/bottom
+    wrap_y = 13
+    
+    if x_order is None:
+        x_names = [t for t in reversed(sorted(set([v for v in x])))]
+    else:
+        x_names = [t for t in x_order]
+        
+    # Wrap to help avoid overflow
+    x_names = [do_wrapping(label, wrap_x) for label in x_names]
+
+    x_to_num = {p[1]:p[0] for p in enumerate(x_names)}
+
+    if y_order is None:
+        y_names = [t for t in sorted(set([v for v in y]))]
+    else:
+        y_names = [t for t in y_order]
+        
+    # Wrap to help avoid overflow
+    y_names = [do_wrapping(label, wrap_y) for label in y_names]
+
+    y_to_num = {p[1]:p[0] for p in enumerate(y_names)}
+
+    ax.tick_params(labelbottom='on', labeltop='on')
+    ax.set_xticks([v for k,v in x_to_num.items()])
+    ax.set_xticklabels([k for k in x_to_num], rotation=90, horizontalalignment='center', linespacing=0.8)
+    ax.set_yticks([v for k,v in y_to_num.items()])
+    ax.set_yticklabels([k for k in y_to_num], linespacing=0.8)
+
+    ax.grid(False, 'major')
+    ax.grid(True, 'minor')
+    ax.set_xticks([t + 0.5 for t in ax.get_xticks()], minor=True)
+    ax.set_yticks([t + 0.5 for t in ax.get_yticks()], minor=True)
+
+    ax.set_xlim([-0.5, max([v for v in x_to_num.values()]) + 0.5])
+    ax.set_ylim([-0.5, max([v for v in y_to_num.values()]) + 0.5])
+    ax.set_facecolor(face_color)
+    delta_in_pix = ax.transData.transform((1, 1)) - ax.transData.transform((0, 0))
+
+    index = 0
+    for cur_x, cur_y, use_circ in zip(x,y,circular):
+        wrapped_x_name = do_wrapping(cur_x, wrap_x)
+        wrapped_y_name = do_wrapping(cur_y, wrap_y)
+        before_coordinate = np.array(ax.transData.transform((x_to_num[wrapped_x_name]-0.5, y_to_num[wrapped_y_name] -0.5)))
+        after_coordinate = np.array(ax.transData.transform((x_to_num[wrapped_x_name]+0.5, y_to_num[wrapped_y_name] +0.5)))
+        before_pixels = np.round(before_coordinate, 0)
+        after_pixels = np.round(after_coordinate, 0)
+        desired_fraction = value_to_size(size[index])
+        if desired_fraction == 0.0:
+            index = index + 1
+            continue
+
+        delta_in_pix = after_pixels - before_pixels
+        gap = np.round((1.0 - desired_fraction) * delta_in_pix / 2, 0)
+        start = before_pixels + gap[0]
+        ending = after_pixels - gap[0]
+        start[0] = start[0] + 1
+        ending[1] = ending[1] - 1
+        start_doc = ax.transData.inverted().transform(start)
+        ending_doc = ax.transData.inverted().transform(ending)
+        cur_size = ending_doc - start_doc
+
+        if not np.isnan(color[index]):
+            if use_circ:
+                cur_rect = patches.Circle((start_doc[0] + cur_size[0] / 2, start_doc[1] + cur_size[1] / 2),
+                                            cur_size[1] / 2, facecolor=value_to_color(color[index]),
+                                            antialiased=True)
+            else:
+                cur_rect = patches.Rectangle((start_doc[0], start_doc[1]),
+                                            cur_size[0], cur_size[1], facecolor=value_to_color(color[index]),
+                                            antialiased=True)
+
+            cur_rect.set_antialiased(True)
+            ax.add_patch(cur_rect)
+
+        index = index + 1
+
+    # Add color legend on the right side of the plot
+    if color_min < color_max:
+        cax = ax.get_figure().add_axes([0.93, 0.1, 0.05, 0.8])
+
+        col_x = [0]*len(palette) # Fixed x coordinate for the bars
+        bar_y=np.linspace(color_min, color_max, n_colors) # y coordinates for each of the n_colors bars
+        cax.set_ylim(color_min, color_max)
+
+        bar_height = bar_y[1] - bar_y[0]
+        cax.barh(
+            y=bar_y,
+            width=[5]*len(palette), # Make bars 5 units wide
+            left=col_x, # Make bars start at 0
+            height=bar_height,
+            color=palette,
+            linewidth=0
+        )
+        cax.set_xlim(1, 2) # Bars are going from 0 to 5, so lets crop the plot somewhere in the middle
+        cax.grid(False) # Hide grid
+        cax.set_facecolor('white') # Make background white
+        cax.set_xticks([]) # Remove horizontal ticks
+        cax.set_yticks(np.linspace(min(bar_y), max(bar_y), 3)) # Show vertical ticks for min, middle and max
+        cax.yaxis.tick_right() # Show vertical ticks on the right
+
+def _mask_corr_significance(r, p, p_bound):
+    r.values[np.where(p.values >= p_bound)] = np.nan
+
+def _mask_diagonal(r):
+    np.fill_diagonal(r.values, np.nan)
+
+def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
+                 corr_method=None, nan_strategy='mask', nan_replace_value=0,
+                 mask_diagonal=None, p_bound=None, ax=None,
+                 map_type='zaric', annot=None, **kwargs):
+    """
+    Arguments:
+        map_type: One of 'zaric', 'standard'.
+    """
     if ax is None:
         ax = plt.gca()
 
-    default_kwargs = dict(center=0, square=True, linewidths=1)
-    default_kwargs.update(**kwargs)
-    kwargs = default_kwargs
+    r, p = corr(data_frame, categorical_inputs=categorical_inputs,
+                numeric_inputs=numeric_inputs, corr_method=corr_method,
+                nan_strategy=nan_strategy, nan_replace_value=nan_replace_value)
 
-    if p_bound is None:
-        r = data_frame.corr()
-        matplot_func(r, *args, ax=ax, **kwargs)
+    if not p_bound is None:
+        _mask_corr_significance(r, p, p_bound)
+
+    if map_type == "zaric":
+        if mask_diagonal is None:
+            mask_diagonal = True
+
+        if mask_diagonal:
+            _mask_diagonal(r)
+
+        _, categorical_inputs, numeric_inputs = _num_cat_select(
+            data_frame, categorical_inputs, numeric_inputs)
+
+        x = []; y = []; v = []; circ = []
+        for col1, content in r.items():
+            for col2, val in content.items():
+                x.append(col1)
+                y.append(col2)
+                v.append(val)
+                circ.append(col1 in numeric_inputs and col2 in numeric_inputs)
+ 
+        default_kwargs = dict(
+            color=v,
+            size=np.abs(v),
+            circular=circ
+        )
+        default_kwargs.update(**kwargs)
+        kwargs = default_kwargs
+
+        _zaric_heatmap(
+            x, y,
+            ax=ax,
+            **kwargs
+        )
+
+    elif map_type == 'standard':
+        if mask_diagonal is None:
+            mask_diagonal = False
+
+        if mask_diagonal:
+            _mask_diagonal(r)
+
+        if annot is None:
+            annot = True
+
+        default_kwargs = dict(center=0, square=True, linewidths=1,
+                              annot=annot)
+        default_kwargs.update(**kwargs)
+        kwargs = default_kwargs
+        sns.heatmap(r, ax=ax, **kwargs)
         ax.xaxis.set_tick_params(rotation=45)
         plt.setp(ax.get_xticklabels(),
             rotation_mode="anchor", horizontalalignment="right")
+    
     else:
-        r, p = corr(data_frame)
-        mask_corr_significance(r, p, p_bound)
-        matplot_func(r, *args, ax=ax, **kwargs)
-        ax.xaxis.set_tick_params(rotation=45)
-        plt.setp(ax.get_xticklabels(),
-            rotation_mode="anchor", horizontalalignment="right")
+        raise ValueError("Unknown map_type '{}'.".format(map_type))
 
     return r
 
