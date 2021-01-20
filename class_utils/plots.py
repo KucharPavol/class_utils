@@ -390,10 +390,11 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
     return r
 
 class ColGrid:
-    def __init__(self, data, x_cols, y_cols, col_wrap=None, height=3, aspect=4/3):
+    def __init__(self, data, x_cols, y_cols=None, col_wrap=None,
+                 height=3, aspect=4/3):
         self.data = data
         self.x_cols = x_cols if not isinstance(x_cols, str) else [x_cols]
-        self.y_cols = y_cols if not isinstance(y_cols, str) else [y_cols]
+        self.y_cols = y_cols if not (isinstance(y_cols, str) or y_cols is None) else [y_cols]
 
         if col_wrap is None:
             col_wrap = min(4, len(self.x_cols)*len(self.y_cols))
@@ -415,7 +416,12 @@ class ColGrid:
             zip(itertools.product(self.x_cols, self.y_cols), axes)
         ):
             plt.sca(ax)
-            func(self.data[x_col], self.data[y_col], *args, **kwargs)
+
+            if y_col is None:
+                func(self.data[x_col], *args, **kwargs)
+            else:
+                func(self.data[x_col], self.data[y_col], *args, **kwargs)
+            
             ax.set_xlabel(x_col)
             ax.set_ylabel(y_col)
 
