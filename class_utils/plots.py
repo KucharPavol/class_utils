@@ -132,7 +132,7 @@ def _zaric_wrap_custom(source_text, separator_chars, width=70, keep_separators=T
 def _zaric_heatmap(y, x, color=None, color_range=None,
             palette='coolwarm', size=None, size_range=[0, 1], marker='s',
             x_order=None, y_order=None, size_scale=None, circular=None,
-            ax=None, face_color='#fdfdfd'):
+            ax=None, face_color='#fdfdfd', wrap_x=12, wrap_y=13):
 
     CORRELATION_ERROR = 83572398457329.0
     CORRELATION_IDENTICAL = 1357239845732.0
@@ -211,8 +211,6 @@ def _zaric_heatmap(y, x, color=None, color_range=None,
 
     def do_wrapping(label, length):
         return _zaric_wrap_custom(label, ["_", "-"], length)
-    wrap_x = 12 # at top/bottom
-    wrap_y = 13
     
     if x_order is None:
         x_names = [t for t in reversed(sorted(set([v for v in x])))]
