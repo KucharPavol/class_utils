@@ -418,9 +418,9 @@ class ColGrid:
             plt.sca(ax)
 
             if y_col is None:
-                func(self.data[x_col], *args, **kwargs)
+                func(x=x_col, data=self.data, *args, **kwargs)
             else:
-                func(self.data[x_col], self.data[y_col], *args, **kwargs)
+                func(x=x_col, y=y_col, data=self.data, *args, **kwargs)
             
             ax.set_xlabel(x_col)
             ax.set_ylabel(y_col)
