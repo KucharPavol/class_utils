@@ -132,10 +132,13 @@ def _zaric_wrap_custom(source_text, separator_chars, width=70, keep_separators=T
 def _zaric_heatmap(y, x, color=None, color_range=None,
             palette='coolwarm', size=None, size_range=[0, 1], marker='s',
             x_order=None, y_order=None, size_scale=None, circular=None,
-            ax=None, face_color='#fdfdfd', wrap_x=12, wrap_y=13):
+            ax=None, face_color=None, wrap_x=12, wrap_y=13):
 
     CORRELATION_ERROR = 83572398457329.0
     CORRELATION_IDENTICAL = 1357239845732.0
+
+    if face_color is None:
+        face_color = '#fdfdfd'
 
     if color is None:
         color = [1]*len(x)
@@ -318,8 +321,8 @@ def _mask_diagonal(r):
 
 def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
                  corr_method=None, nan_strategy='mask', nan_replace_value=0,
-                 mask_diagonal=None, p_bound=None, ax=None,
-                 map_type='zaric', annot=None, **kwargs):
+                 mask_diagonal=True, p_bound=None, ax=None,
+                 map_type='zaric', annot=None, face_color=None, **kwargs):
     """
     Arguments:
         map_type: One of 'zaric', 'standard'.
@@ -334,13 +337,10 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
     if not p_bound is None:
         _mask_corr_significance(r, p, p_bound)
 
+    if mask_diagonal:
+        _mask_diagonal(r)
+
     if map_type == "zaric":
-        if mask_diagonal is None:
-            mask_diagonal = True
-
-        if mask_diagonal:
-            _mask_diagonal(r)
-
         _, categorical_inputs, numeric_inputs = _num_cat_select(
             data_frame, categorical_inputs, numeric_inputs)
 
@@ -363,24 +363,23 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
         _zaric_heatmap(
             x, y,
             ax=ax,
+            face_color=face_color,
             **kwargs
         )
 
     elif map_type == 'standard':
-        if mask_diagonal is None:
-            mask_diagonal = False
-
-        if mask_diagonal:
-            _mask_diagonal(r)
-
         if annot is None:
             annot = True
+
+        if face_color is None:
+            face_color = 'black'
 
         default_kwargs = dict(center=0, square=True, linewidths=1,
                               annot=annot)
         default_kwargs.update(**kwargs)
         kwargs = default_kwargs
         sns.heatmap(r, ax=ax, **kwargs)
+        ax.set_facecolor(face_color)
         ax.xaxis.set_tick_params(rotation=45)
         plt.setp(ax.get_xticklabels(),
             rotation_mode="anchor", horizontalalignment="right")
