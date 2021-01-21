@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from ._from_sv import theils_u, correlation_ratio
+from ._from_sv import theils_u, theils_sym_u, correlation_ratio
 from scipy.stats import pearsonr
 from itertools import combinations
+from enum import Enum
 import pandas as pd
 import numpy as np
 
@@ -62,9 +63,16 @@ def _num_cat_select(df, categorical_inputs=None, numeric_inputs=None):
 
     return df_sel, categorical_inputs, numeric_inputs
 
+class CorrType:
+    num_vs_num = 0
+    num_vs_cat = 1
+    cat_vs_num = 2
+    cat_vs_cat = 3
+
 def corr(
     df, categorical_inputs=None, numeric_inputs=None,
-    corr_method=None, nan_strategy='mask', nan_replace_value=0
+    corr_method=None, nan_strategy='mask', nan_replace_value=0,
+    return_corr_types=False, sym_u=True
 ):
     """
     A routine that computes associations between pairs of variables
@@ -96,6 +104,12 @@ def corr(
     
     df_r = pd.DataFrame(np.ones([df_sel.shape[1], df_sel.shape[1]]), columns=df_sel.columns, index=df_sel.columns)
     df_p = pd.DataFrame(np.zeros([df_sel.shape[1], df_sel.shape[1]]), columns=df_sel.columns, index=df_sel.columns)
+    df_ct = pd.DataFrame(np.zeros([df_sel.shape[1], df_sel.shape[1]]), columns=df_sel.columns, index=df_sel.columns)
+
+    if sym_u:
+        theil = theils_sym_u
+    else:
+        theil = theils_u
         
     for col1, col2 in combinations(df_sel.columns, 2):        
         if col1 in numeric_inputs:
@@ -111,6 +125,8 @@ def corr(
                 df_r.loc[col2, col1] = r
                 df_p.loc[col1, col2] = p
                 df_p.loc[col2, col1] = p
+                df_ct.loc[col1, col2] = CorrType.num_vs_num
+                df_ct.loc[col2, col1] = CorrType.num_vs_num
             else:
                 # numeric vs. categorical
                 x, y = _make_finite(
@@ -123,6 +139,8 @@ def corr(
                 df_r.loc[col2, col1] = r
                 df_p.loc[col1, col2] = p
                 df_p.loc[col2, col1] = p
+                df_ct.loc[col1, col2] = CorrType.num_vs_cat
+                df_ct.loc[col2, col1] = CorrType.num_vs_cat
         else:
             if col2 in numeric_inputs:
                 # categorical vs. numeric
@@ -136,6 +154,8 @@ def corr(
                 df_r.loc[col2, col1] = r
                 df_p.loc[col1, col2] = p
                 df_p.loc[col2, col1] = p
+                df_ct.loc[col1, col2] = CorrType.cat_vs_num
+                df_ct.loc[col2, col1] = CorrType.cat_vs_num
             else:
                 # categorical vs. categorical
                 x, y = _make_finite(
@@ -143,9 +163,22 @@ def corr(
                     col1_numeric=False, col2_numeric=False,
                     method=nan_strategy, replace_value=nan_replace_value
                 )
-                df_r.loc[col1, col2] = theils_u(x, y)
-                df_r.loc[col2, col1] = theils_u(y, x)
+
+                if sym_u:
+                    u = theils_sym_u(x, y)
+                    df_r.loc[col1, col2] = u
+                    df_r.loc[col2, col1] = u
+                else:
+                    df_r.loc[col1, col2] = theils_sym_u(x, y)
+                    df_r.loc[col2, col1] = theils_sym_u(y, x)
+
                 df_p.loc[col1, col2] = 0.0
                 df_p.loc[col2, col1] = 0.0
-                
-    return df_r, df_p
+                df_ct.loc[col1, col2] = CorrType.cat_vs_cat
+                df_ct.loc[col2, col1] = CorrType.cat_vs_cat
+ 
+    if return_corr_types:
+        return df_r, df_p, df_ct
+    else:
+        return df_r, df_p
+ 

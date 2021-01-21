@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import matplotlib.patches as patches
+import matplotlib.colorbar as colorbar
 from itertools import combinations
 import math
 import itertools
+from numpy import ma
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.collections import PatchCollection
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from .corr import corr, _num_cat_select
-from matplotlib.colors import LogNorm
+from .corr import corr, CorrType
+from matplotlib.colors import LogNorm, PowerNorm
 from seaborn.matrix import _DendrogramPlotter
 from .utils import numpy_crosstab
 import pandas as pd
@@ -129,13 +132,35 @@ def _zaric_wrap_custom(source_text, separator_chars, width=70, keep_separators=T
             char_index += 1
     return output
 
-def _zaric_heatmap(y, x, color=None, color_range=None,
-            palette='coolwarm', size=None, size_range=[0, 1], marker='s',
-            x_order=None, y_order=None, size_scale=None, circular=None,
-            ax=None, face_color=None, wrap_x=12, wrap_y=13):
+def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
+            x_order=None, y_order=None, circular=None,
+            ax=None, face_color=None, wrap_x=12, wrap_y=13, square=True,
+            cbar=True, cax=None, cbar_kws=None, mask=None,
+            color_norm=None, size_norm=None):
+    if ax is None:
+        ax = plt.gca()
 
-    CORRELATION_ERROR = 83572398457329.0
-    CORRELATION_IDENTICAL = 1357239845732.0
+    if color_norm is None:
+        color_norm = PowerNorm(0.925)
+    
+    if not color_norm.scaled():
+        vmax = max(np.abs(np.nanmin(color)), np.abs(np.nanmax(color)))
+        vmin = -vmax
+        color_norm.autoscale([vmin, vmax])
+
+    if size is None:
+        size = np.ones(len(x))
+
+    if size_norm is None:
+        size_norm = PowerNorm(0.5)
+    size_norm.autoscale_None(size)
+
+    if cbar_kws is None:
+        cbar_kws = {}
+    
+    if square:
+        ax.set_aspect('equal')
+        plt.draw()
 
     if face_color is None:
         face_color = '#fdfdfd'
@@ -146,72 +171,9 @@ def _zaric_heatmap(y, x, color=None, color_range=None,
     if circular is None:
         circular = [False]*len(x)
 
-    if palette is None:
-        palette = []
-        n_colors = 256
-        for i in range(0,128):
-            palette.append( (0.85, (0.85/128)*i, (0.85/128)*i ))
-        for i in range(128,256):
-            palette.append( (0.85 - 0.85*(i-128.0)/128.0, 0.85 - 0.85*(i-128.0)/128.0, 0.85 ))
-    elif isinstance(palette, str):
-        n_colors = 256
-        palette = sns.color_palette(palette, n_colors=n_colors)
-    else:
-        n_colors = len(palette)
-
-    if color_range is None:
-        color_min, color_max = np.nanmin(color), np.nanmax(color)
-        color_max = np.maximum(np.abs(color_min), np.abs(color_max))
-        color_min = -color_max
-    else:    
-        color_min, color_max = color_range
-
-    def value_to_color(val):
-        if color_min == color_max:
-            return palette[-1]
-        else:
-            # For now, return "max positive" correlation color
-            if val == CORRELATION_IDENTICAL:
-                return palette[(n_colors - 1)]
-            if val == CORRELATION_ERROR:
-                return palette[(n_colors - 1)]
-            val_position = float((val - color_min)) / (color_max - color_min) # position of value in the input range, relative to the length of the input range
-            val_position = min(max(val_position, 0), 1) # bound the position betwen 0 and 1
-            # LOG IT
-            val_position = math.pow(val_position, 0.925)
-            ind = int(val_position * (n_colors - 1)) # target index in the color palette
-            return palette[ind]
-
-    if size is None:
-        size = [1]*len(x)
-
-    if size_range is None:
-        size_min, size_max = min(size), max(size)
-    else:
-        size_min, size_max = size_range[0], size_range[1]
-
-    if size_scale is None:
-        size_scale = 500
-
-    # Scale with num squares
-    size_scale = size_scale / len(x)
-    def value_to_size(val):
-        if val == 0:
-            return 0.0
-        if val == abs(CORRELATION_IDENTICAL):
-            return 1.0
-        # TODO: Better/more intuitive display of correlation errors
-        if val == abs(CORRELATION_ERROR):
-            return 0.0
-        if size_min == size_max:
-            return 1 * size_scale
-        else:
-            val_position = (val - size_min) * 0.999 / (size_max - size_min) + 0.001 # position of value in the input range, relative to the length of the input range
-            val_position = min(max(val_position, 0), 1) # bound the position betwen 0 and 1
-            # LOG IT
-            val_position = math.pow(val_position, 0.5)
-            return val_position
-
+    if cmap is None:
+        cmap = sns.color_palette(palette, as_cmap=True)
+    
     def do_wrapping(label, length):
         return _zaric_wrap_custom(label, ["_", "-"], length)
     
@@ -228,7 +190,7 @@ def _zaric_heatmap(y, x, color=None, color_range=None,
     if y_order is None:
         y_names = [t for t in sorted(set([v for v in y]))]
     else:
-        y_names = [t for t in y_order]
+        y_names = [t for t in y_order[::-1]]
         
     # Wrap to help avoid overflow
     y_names = [do_wrapping(label, wrap_y) for label in y_names]
@@ -237,7 +199,8 @@ def _zaric_heatmap(y, x, color=None, color_range=None,
 
     ax.tick_params(labelbottom='on', labeltop='on')
     ax.set_xticks([v for k,v in x_to_num.items()])
-    ax.set_xticklabels([k for k in x_to_num], rotation=90, horizontalalignment='center', linespacing=0.8)
+    ax.set_xticklabels([k for k in x_to_num], rotation=90,
+        horizontalalignment='center', linespacing=0.8)
     ax.set_yticks([v for k,v in y_to_num.items()])
     ax.set_yticklabels([k for k in y_to_num], linespacing=0.8)
 
@@ -252,106 +215,131 @@ def _zaric_heatmap(y, x, color=None, color_range=None,
     delta_in_pix = ax.transData.transform((1, 1)) - ax.transData.transform((0, 0))
 
     index = 0
-    for cur_x, cur_y, use_circ in zip(x,y,circular):
-        wrapped_x_name = do_wrapping(cur_x, wrap_x)
-        wrapped_y_name = do_wrapping(cur_y, wrap_y)
-        before_coordinate = np.array(ax.transData.transform((x_to_num[wrapped_x_name]-0.5, y_to_num[wrapped_y_name] -0.5)))
-        after_coordinate = np.array(ax.transData.transform((x_to_num[wrapped_x_name]+0.5, y_to_num[wrapped_y_name] +0.5)))
-        before_pixels = np.round(before_coordinate, 0)
-        after_pixels = np.round(after_coordinate, 0)
-        desired_fraction = value_to_size(size[index])
-        if desired_fraction == 0.0:
+    patch_col = []
+    patch_col_ind = []
+
+    for cur_x, cur_y, use_circ in zip(x, y, circular):
+        if (size[index] == 0 or
+            np.isnan(color[index]) or
+            (not mask is None and mask[index])
+        ):
             index = index + 1
             continue
 
+        wrapped_x_name = do_wrapping(cur_x, wrap_x)
+        wrapped_y_name = do_wrapping(cur_y, wrap_y)
+        before_coordinate = np.array(
+            ax.transData.transform((x_to_num[wrapped_x_name]-0.5,
+                                    y_to_num[wrapped_y_name]-0.5)))
+        after_coordinate = np.array(
+            ax.transData.transform((x_to_num[wrapped_x_name]+0.5,
+                                    y_to_num[wrapped_y_name]+0.5)))
+        before_pixels = np.round(before_coordinate, 0)
+        after_pixels = np.round(after_coordinate, 0)
+        desired_fraction = size_norm(size[index])
+
         delta_in_pix = after_pixels - before_pixels
         gap = np.round((1.0 - desired_fraction) * delta_in_pix / 2, 0)
-        start = before_pixels + gap[0]
-        ending = after_pixels - gap[0]
+        # make sure that non-zero sized markers don't disappear
+        gap[np.where(delta_in_pix - gap*2 < 3)] -= 3
+
+        start = before_pixels + gap
+        ending = after_pixels - gap
         start[0] = start[0] + 1
         ending[1] = ending[1] - 1
         start_doc = ax.transData.inverted().transform(start)
         ending_doc = ax.transData.inverted().transform(ending)
         cur_size = ending_doc - start_doc
 
-        if not np.isnan(color[index]):
-            if use_circ:
-                cur_rect = patches.Circle((start_doc[0] + cur_size[0] / 2, start_doc[1] + cur_size[1] / 2),
-                                            cur_size[1] / 2, facecolor=value_to_color(color[index]),
-                                            antialiased=True)
-            else:
-                cur_rect = patches.Rectangle((start_doc[0], start_doc[1]),
-                                            cur_size[0], cur_size[1], facecolor=value_to_color(color[index]),
-                                            antialiased=True)
+        if use_circ:
+            cur_rect = patches.Circle(
+                (start_doc[0] + cur_size[0] / 2,
+                 start_doc[1] + cur_size[1] / 2),
+                cur_size[1] / 2, antialiased=True)
+        else:
+            cur_rect = patches.Rectangle(
+                (start_doc[0], start_doc[1]),
+                cur_size[0], cur_size[1], antialiased=True)
 
-            cur_rect.set_antialiased(True)
-            ax.add_patch(cur_rect)
+        cur_rect.set_antialiased(True)
+        patch_col.append(cur_rect)
+        patch_col_ind.append(index)
 
         index = index + 1
 
-    # Add color legend on the right side of the plot
-    if color_min < color_max:
-        cax = ax.get_figure().add_axes([0.93, 0.1, 0.05, 0.8])
+    patch_col = PatchCollection(
+        patch_col, array=color[patch_col_ind],
+        norm=color_norm, cmap=cmap
+    )
+    ax.add_collection(patch_col)
 
-        col_x = [0]*len(palette) # Fixed x coordinate for the bars
-        bar_y=np.linspace(color_min, color_max, n_colors) # y coordinates for each of the n_colors bars
-        cax.set_ylim(color_min, color_max)
+    if cbar:
+        plt.colorbar(patch_col, cax=cax, cmap=cmap, **cbar_kws)
 
-        bar_height = bar_y[1] - bar_y[0]
-        cax.barh(
-            y=bar_y,
-            width=[5]*len(palette), # Make bars 5 units wide
-            left=col_x, # Make bars start at 0
-            height=bar_height,
-            color=palette,
-            linewidth=0
-        )
-        cax.set_xlim(1, 2) # Bars are going from 0 to 5, so lets crop the plot somewhere in the middle
-        cax.grid(False) # Hide grid
-        cax.set_facecolor('white') # Make background white
-        cax.set_xticks([]) # Remove horizontal ticks
-        cax.set_yticks(np.linspace(min(bar_y), max(bar_y), 3)) # Show vertical ticks for min, middle and max
-        cax.yaxis.tick_right() # Show vertical ticks on the right
-
-def _mask_corr_significance(r, p, p_bound):
-    r.values[np.where(p.values >= p_bound)] = np.nan
-
-def _mask_diagonal(r):
-    np.fill_diagonal(r.values, np.nan)
-
-def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
-                 corr_method=None, nan_strategy='mask', nan_replace_value=0,
-                 mask_diagonal=True, p_bound=None, ax=None,
-                 map_type='zaric', annot=None, face_color=None, **kwargs):
+def heatmap(df, corr_types=None, map_type='zaric', ax=None, face_color=None,
+            annot=None, cbar=True, mask=None,
+            row_cluster=False, row_cluster_metric='euclidean',
+            row_cluster_method='average', row_cluster_linkage=None,
+            col_cluster=False, col_cluster_metric='euclidean',
+            col_cluster_method='average', col_cluster_linkage=None,
+             **kwargs):
     """
     Arguments:
-        map_type: One of 'zaric', 'standard'.
+        map_type: One of 'zaric', 'standard', 'dendrograms'.
     """
-    if ax is None:
-        ax = plt.gca()
+    if map_type == 'dendrograms':
+        if not ax is None:
+            raise ValueError("Argument 'ax' is not supported for map_type == 'dendrograms'.")
+    else:
+        if ax is None:
+            ax = plt.gca()
 
-    r, p = corr(data_frame, categorical_inputs=categorical_inputs,
-                numeric_inputs=numeric_inputs, corr_method=corr_method,
-                nan_strategy=nan_strategy, nan_replace_value=nan_replace_value)
+    if not mask is None:
+        mask = np.asarray(mask)
 
-    if not p_bound is None:
-        _mask_corr_significance(r, p, p_bound)
+    if not corr_types is None:
+        corr_types = np.asarray(corr_types)
 
-    if mask_diagonal:
-        _mask_diagonal(r)
+    if row_cluster and not map_type == 'dendrograms':
+        row_ind = _DendrogramPlotter(
+            df, axis=0, metric=row_cluster_metric,
+            method=row_cluster_method, linkage=row_cluster_linkage,
+            label=False, rotate=False
+        ).reordered_ind
+
+        df = df.reindex(df.index[row_ind])
+
+        if not mask is None:
+            mask = mask[row_ind, :]
+        
+        if not corr_types is None:
+            corr_types = corr_types[row_ind, :]
+
+    if col_cluster and not map_type == 'dendrograms':
+        col_ind = _DendrogramPlotter(
+            df, axis=1, metric=col_cluster_metric,
+            method=col_cluster_method, linkage=col_cluster_linkage,
+            label=False, rotate=False
+        ).reordered_ind
+        
+        df = df.reindex(df.columns[col_ind], axis=1)
+        
+        if not mask is None:
+            mask = mask[:, col_ind]
+
+        if not corr_types is None:
+            corr_types = corr_types[:, col_ind]
 
     if map_type == "zaric":
-        _, categorical_inputs, numeric_inputs = _num_cat_select(
-            data_frame, categorical_inputs, numeric_inputs)
+        l = np.asarray(list(itertools.product(df.index, df.columns)))
+        x = l[:, 0]
+        y = l[:, 1]
+        v = df.values.reshape(-1)
+        m = mask.reshape(-1) if not mask is None else None
+        circ = np.zeros(len(x))
+        if not corr_types is None:
+            circ[np.where(corr_types.reshape(-1) == CorrType.num_vs_num)] = True
 
-        x = []; y = []; v = []; circ = []
-        for col1, content in r.items():
-            for col2, val in content.items():
-                x.append(col1)
-                y.append(col2)
-                v.append(val)
-                circ.append(col1 in numeric_inputs and col2 in numeric_inputs)
- 
         default_kwargs = dict(
             color=v,
             size=np.abs(v),
@@ -364,10 +352,17 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
             x, y,
             ax=ax,
             face_color=face_color,
+            cbar=cbar,
+            mask=m,
+            x_order=df.columns,
+            y_order=df.index,
             **kwargs
         )
 
-    elif map_type == 'standard':
+        ax.set_xlabel(df.columns.name)
+        ax.set_ylabel(df.index.name)
+
+    elif map_type == 'standard' or map_type == 'dendrograms':
         if annot is None:
             annot = True
 
@@ -378,7 +373,14 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
                               annot=annot)
         default_kwargs.update(**kwargs)
         kwargs = default_kwargs
-        sns.heatmap(r, ax=ax, **kwargs)
+
+        if map_type == 'dendrograms':
+            del kwargs['square']
+            sns.clustermap(df, cbar=cbar, mask=mask, **kwargs)
+        else:
+            sns.heatmap(df, ax=ax, cbar=cbar, mask=mask, **kwargs)
+        
+        if ax is None: ax = plt.gcf().axes[2]
         ax.set_facecolor(face_color)
         ax.xaxis.set_tick_params(rotation=45)
         plt.setp(ax.get_xticklabels(),
@@ -387,6 +389,34 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
     else:
         raise ValueError("Unknown map_type '{}'.".format(map_type))
 
+def _mask_corr_significance(mask, p, p_bound):
+    mask = np.asarray(mask)
+    mask[np.where(mask >= p_bound)] = True
+
+def _mask_diagonal(mask):
+    mask = np.asarray(mask)
+    np.fill_diagonal(mask, True)
+
+def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
+                 corr_method=None, nan_strategy='mask', nan_replace_value=0,
+                 mask_diagonal=True, p_bound=None, ax=None, map_type='zaric',
+                 annot=None, face_color=None, square=True, mask=None, **kwargs):
+
+    r, p, ct = corr(data_frame, categorical_inputs=categorical_inputs,
+                 numeric_inputs=numeric_inputs, corr_method=corr_method,
+                 nan_strategy=nan_strategy, nan_replace_value=nan_replace_value,
+                 return_corr_types=True)
+
+    mask = np.zeros(r.shape) if mask is None else np.copy(mask)
+    
+    if not p_bound is None:
+        _mask_corr_significance(mask, p, p_bound)
+
+    if mask_diagonal:
+        _mask_diagonal(mask)
+    
+    heatmap(r, corr_types=ct, map_type=map_type, ax=ax, face_color=face_color,
+            annot=annot, square=square, mask=mask, **kwargs)
     return r
 
 class ColGrid:
@@ -498,70 +528,14 @@ def sorted_order(func, by='median'):
         return func(x, y, *args, data=df, order=order, orient=orient, **kwargs)
     
     return wrapper
-
-def crosstab_plot(x, y, dropna=False, shownan=False, *args, **kwargs):
+             
+def crosstab_plot(x, y, data=None, dropna=False, shownan=False, *args, **kwargs):
+    if not data is None:
+        x = data[x]
+        y = data[y]
     tab = numpy_crosstab(y, x, dropna=dropna, shownan=shownan)
-    return heatmap_plot(tab, *args, **kwargs)
-
-def heatmap_plot(
-    tab, *args, logscale=False, vmin=0, vmax=None,
-    annot=None, cbar=True, row_cluster=False, col_cluster=False, show_dendrograms=False,
-    metric='euclidean', method='average', row_linkage=None, col_linkage=None,
-    **kwargs
-):
-    kwargs = dict(**kwargs)
-    
-    if not show_dendrograms and row_cluster:
-        row_ind = _DendrogramPlotter(
-            tab, axis=0, metric=metric,
-            method=method, linkage=row_linkage,
-            label=True, rotate=False
-        ).reordered_ind
-
-        tab.index = tab.index[row_ind]
-        tab.values[:] = tab.values[row_ind, :]
-        
-    if not show_dendrograms and col_cluster:
-        col_ind = _DendrogramPlotter(
-            tab, axis=1, metric=metric,
-            method=method, linkage=col_linkage,
-            label=True, rotate=False
-        ).reordered_ind
-        
-        tab.columns = tab.columns[col_ind]
-        tab.values[:] = tab.values[:, col_ind]
-   
-    if logscale:
-        vmin = max(vmin, 1)
-        tab += 1
-        norm = LogNorm()
-        
-        if annot == True:
-            annot = tab.values - 1
-        
-        kwargs.update(norm=norm)
-        
-    kwargs.update(vmin=vmin, vmax=vmax, annot=annot, cbar=cbar)
-    
-    if show_dendrograms:
-        kwargs.update(metric=metric, method=method,
-                      row_linkage=row_linkage, col_linkage=col_linkage,
-                      row_cluster=row_cluster, col_cluster=col_cluster)
-        mat = sns.clustermap(tab, *args, **kwargs)
-    else:
-        mat = sns.heatmap(tab, *args, **kwargs)
-        
-    cax = mat.cax if hasattr(mat, 'cax') else mat.collections[-1].colorbar.ax
-    
-    if not cbar: # if colorbar is off, hide its axes
-        cax.axis('off')
-    elif logscale: # fix colorbar ticks for logscale plots
-        ytick_labels = cax.get_yticklabels()
-        for tl in ytick_labels:
-            tl.set_text(tl.get_text() + "$-1$")
-        cax.set_yticklabels(ytick_labels)
-
-    return mat
+    heatmap(tab, *args, **kwargs)
+    return tab
 
 def _groupby_propplot(x, y):
     df = pd.concat([x, y], axis=1)

@@ -89,6 +89,45 @@ def theils_u(y, x):
     else:
         return (s_x - s_xy) / s_x
 
+def theils_sym_u(y, x):
+    """
+    Calculates the symmetric version of the Uncertainty coefficient.
+    Wikipedia: https://en.wikipedia.org/wiki/Uncertainty_coefficient
+    **Returns:** float in the range of [0,1]
+    Parameters
+    ----------
+    x : list / NumPy ndarray / Pandas Series
+        A sequence of categorical measurements
+    y : list / NumPy ndarray / Pandas Series
+        A sequence of categorical measurements
+    """
+    s_xy = conditional_entropy(x, y)
+    s_yx = conditional_entropy(y, x)
+    
+    x_counter = Counter(x)
+    x_total_occurrences = sum(x_counter.values())
+
+    y_counter = Counter(y)
+    y_total_occurrences = sum(y_counter.values())
+
+    p_x = list(map(lambda n: n / x_total_occurrences, x_counter.values()))
+    p_y = list(map(lambda n: n / y_total_occurrences, y_counter.values()))
+
+    s_x = ss.entropy(p_x)
+    s_y = ss.entropy(p_y)
+    
+    if s_x == 0:
+        u_xy = 1
+    else:
+        u_xy = (s_x - s_xy) / s_x
+
+    if s_y == 0:
+        u_yx = 1
+    else:
+        u_yx = (s_y - s_yx) / s_y
+
+    return (s_x * u_xy + s_y * u_yx) / (s_x + s_y)
+
 def correlation_ratio(categories, measurements):
     """
     Calculates the Correlation Ratio (sometimes marked by the greek letter Eta)
