@@ -533,6 +533,11 @@ class ColGrid:
         self.height = height
         self.aspect = aspect
 
+    def map_dataframe(self, func, *args, **kwargs):
+        kwargs = kwargs.copy()
+        kwargs['data'] = self.data
+        return self.map(func, *args, **kwargs)
+
     def map(self, func, *args, **kwargs):
         height = self.height
         width = self.height * self.aspect
@@ -559,12 +564,13 @@ class ColGrid:
             plt.sca(ax)
 
             if y_col is None:
-                func(x=x_col, data=self.data, *args, **kwargs)
+                func(x=x_col, *args, **kwargs)
             else:
-                func(x=x_col, y=y_col, data=self.data, *args, **kwargs)
+                func(x=x_col, y=y_col, *args, **kwargs)
             
             ax.set_xlabel(x_col)
-            ax.set_ylabel(y_col)
+            if not y_col is None:
+                ax.set_ylabel(y_col)
 
         for ax in axes[iax+1:]:
             ax.axis('off')
