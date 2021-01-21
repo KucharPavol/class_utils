@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import matplotlib.patches as patches
-import matplotlib.colorbar as colorbar
-from itertools import combinations
-import itertools
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -17,6 +14,8 @@ from seaborn.matrix import _DendrogramPlotter
 from .utils import numpy_crosstab
 import pandas as pd
 import numbers
+import itertools
+import math
 
 def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
                     with_error=True, 
@@ -502,11 +501,30 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
     return r, p, ct
 
 class ColGrid:
-    def __init__(self, data, x_cols, y_cols=None, col_wrap=None,
-                 height=3, aspect=4/3):
+    def __init__(self, data, x_cols, y_cols=None, interact="product",
+                 col_wrap=None, height=3, aspect=4/3, ):
+        """
+        Creates a grid of plots to which a plot can be mapped using ColGrid.map.
+        
+        Arguments:
+            data: The dataframe to use for the grid.
+            x_cols: The columns that will go on the x axis.
+            y_cols: The columns that will go on the y axis.
+            interact: The interactions between x_cols and y_cols:
+                * 'product': plot each x against each y;
+                * 'zip': zip the x_cols and y_cols and iterate through them;
+                * 'comb': plot combinations of x_cols (y_cols must be None);
+            col_wrap: The number of columns in the grid's layout.
+            height: Height of the grid.
+            aspect: The grid's aspect ratio.
+        """
+        if interact == "comb" and not y_cols is None:
+            raise ValueError("When using interact == 'comb', y_cols must be None.")
+
         self.data = data
         self.x_cols = x_cols if not isinstance(x_cols, str) else [x_cols]
         self.y_cols = y_cols if not (isinstance(y_cols, str) or y_cols is None) else [y_cols]
+        self.interact = interact
 
         if col_wrap is None:
             col_wrap = min(4, len(self.x_cols)*len(self.y_cols))
@@ -518,15 +536,26 @@ class ColGrid:
     def map(self, func, *args, **kwargs):
         height = self.height
         width = self.height * self.aspect
-        num_plots = len(self.x_cols) * len(self.y_cols)
-        num_rows = int(np.ceil(num_plots / self.col_wrap))
+        
+        if self.interact == "product":
+            xycol_iter = itertools.product(self.x_cols, self.y_cols)
+            num_plots = len(self.x_cols) * len(self.y_cols)
+        elif self.interact == "zip":
+            xycol_iter = zip(self.x_cols, self.y_cols)
+            num_plots = min(len(self.x_cols), len(self.y_cols))
+        elif self.interact == "comb":
+            xycol_iter = itertools.combinations(self.x_cols, 2)
+            n = len(self.x_cols); k = 2
+            num_plots = math.factorial(n) / (math.factorial(k) * math.factorial(n - k))
+        else:
+            raise ValueError("Uknown interact method '{}'.".format(self.interact))
 
+        num_rows = int(np.ceil(num_plots / self.col_wrap))
         fig, axes = plt.subplots(num_rows, self.col_wrap, squeeze=False)
         axes = np.ravel(axes)
+        xycol_iter = zip(xycol_iter, axes)
 
-        for iax, ((x_col, y_col), ax) in enumerate(
-            zip(itertools.product(self.x_cols, self.y_cols), axes)
-        ):
+        for iax, ((x_col, y_col), ax) in enumerate(xycol_iter):
             plt.sca(ax)
 
             if y_col is None:
