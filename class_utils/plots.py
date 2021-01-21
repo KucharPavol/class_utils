@@ -640,10 +640,13 @@ def crosstab_plot(x, y, data=None, dropna=False, shownan=False, **kwargs):
     heatmap(tab, **kwargs)
     return tab
 
-def _groupby_propplot(x, y):
+def _groupby_propplot(x, y, data=None):
+    if not data is None:
+        x = data[x]
+        y = data[y]
     df = pd.concat([x, y], axis=1)
     propby = df.groupby(x.name)[y.name].mean()
-    sns.barplot(propby.index, propby)
+    sns.barplot(x=propby.index, y=propby)
 
 def proportion_plot(df, x_col, prop_cols):
     """
