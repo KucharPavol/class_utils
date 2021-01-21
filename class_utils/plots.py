@@ -589,7 +589,7 @@ def sorted_order(func, by='median'):
     Arguments:
         by: What to order the elements by; 'median' is used by default.
     """
-    def wrapper(x=None, y=None, data=None, orient=None, *args, **kwargs):
+    def wrapper(x=None, y=None, data=None, orient=None, **kwargs):
         if not data is None:
             xx = data[x]
             yy = data[y]
@@ -613,7 +613,7 @@ def sorted_order(func, by='median'):
         df_med = sort_method()
         order = df_med.sort_values().index.tolist()
                     
-        return func(x, y, *args, data=df, order=order, orient=orient, **kwargs)
+        return func(x=x, y=y, data=df, order=order, orient=orient, **kwargs)
     
     return wrapper
              
