@@ -11,7 +11,7 @@ def numpy_crosstab(x, y, dropna=False, shownan=False):
     y_cats, y_enc = np.unique(y.astype('str'), return_inverse=True)
 
     cm = np.zeros((len(x_cats), len(y_cats)), dtype=int)
-    np.add.at(cm, [x_enc, y_enc], 1)
+    np.add.at(cm, (x_enc, y_enc), 1)
 
     cm_df = pd.DataFrame(cm, columns=y_cats, index=x_cats)
     cm_df.index.name = x.name
