@@ -2,6 +2,18 @@ import numpy as np
 import pandas as pd
 
 def numpy_crosstab(x, y, dropna=False, shownan=False):
+    """
+    Gathers and crosstabulates different unique values from x and y, returning
+    a dataframe with the count of their co-occurences.
+
+    Arguments:
+        x: A series object (e.g. a dataframe column).
+        y: A series object (e.g. a dataframe column).
+        dropna: Whether to drop entries where at least one of x and y
+            is missing a value.
+        shownan: Whether to include NaN entries in the crosstabulation
+            or drop them before the dataframe is returned.
+    """
     if dropna:
         ind = ~(x.isnull() | y.isnull())
         x = x[ind]

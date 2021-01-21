@@ -49,6 +49,26 @@ def _make_finite(df, col1, col2, col1_numeric, col2_numeric,
     return x, y
 
 def _num_cat_select(df, categorical_inputs=None, numeric_inputs=None):
+    """
+    Splits columns into categorical and numeric.
+
+    Returns df_sel, categorical_inputs, numeric_inputs, where the last two
+    items are the assignments of columns as categorical or numeric and df_sel
+    is the filtered out version of the input dataframe, which only contains
+    columns categorical_inputs $\cup$ numeric_inputs.
+
+    Arguments:
+        df: The dataframe.
+        categorical_inputs: Names of the columns that hold numeric inputs.
+            Defaults to None, i.e. no categorical inputs.
+        numeric_inputs: Names of the columns that hold numeric inputs.
+            Defaults to None, i.e. all columns with numeric data types
+            should be used, except those listed in categorical_inputs.
+            If numeric_inputs is not None and there are columns that are
+            marked as neither categorical, nor numeric, they will be dropped.
+            If a column is listed as both numeric and categorical, it
+            is processed as numeric.
+    """
     if categorical_inputs is None:
         categorical_inputs = set()
     else:
@@ -63,7 +83,14 @@ def _num_cat_select(df, categorical_inputs=None, numeric_inputs=None):
 
     return df_sel, categorical_inputs, numeric_inputs
 
-class CorrType:
+class CorrType(Enum):
+    """
+    An enum expressing the correlation type:
+        * num_vs_num: numeric vs. numeric;
+        * num_vs_cat: numeric vs. categorical;
+        * cat_vs_num: categorical vs. numeric;
+        * cat_vs_cat: categorical vs. categorical.
+    """
     num_vs_num = 0
     num_vs_cat = 1
     cat_vs_num = 2
@@ -86,6 +113,7 @@ def corr(
     For the other types of associations, it holds zeros.
     
     Arguments:
+        df: The dataframe to compute associations on.
         categorical_inputs: Names of the columns that hold numeric inputs.
             Defaults to None, i.e. no categorical inputs.
         numeric_inputs: Names of the columns that hold numeric inputs.
@@ -95,6 +123,18 @@ def corr(
             neither categorical, nor numeric, they will be dropped.
             If a column is listed as both numeric and categorical, it
             is processed as numeric.
+        corr_method: The correlation method. Defaults to pearsonr.
+        nan_strategy: Specifies how to handle NaNs (and infinity for numeric
+            inputs):
+            * "mask": remove rows that contain a NaN before the computation;
+            * "replace": replace the NaNs with nan_replace_value;
+        nan_replace_value: The value to replace NaNs with when nan_strategy is
+            "replace". Defaults to 0.
+        return_corr_types: Specifies whether to also return a correlation
+            types dataframe. If true, a dataframe of CorrType values is
+            returned as the third element of the return tuple.
+        sym_u: If True (default), the symmetric variant of the uncertainty 
+            coefficient is used instead of the basic asymmetric variant.
     """
     if corr_method is None:
         corr_method = pearsonr

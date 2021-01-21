@@ -3,9 +3,7 @@
 import matplotlib.patches as patches
 import matplotlib.colorbar as colorbar
 from itertools import combinations
-import math
 import itertools
-from numpy import ma
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -14,7 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from .corr import corr, CorrType
-from matplotlib.colors import LogNorm, PowerNorm
+from matplotlib.colors import PowerNorm
 from seaborn.matrix import _DendrogramPlotter
 from .utils import numpy_crosstab
 import pandas as pd
@@ -277,15 +275,52 @@ def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
         plt.colorbar(patch_col, cax=cax, cmap=cmap, **cbar_kws)
 
 def heatmap(df, corr_types=None, map_type='zaric', ax=None, face_color=None,
-            annot=None, cbar=True, mask=None,
+            annot=None, cbar=True, cbar_kws=None, mask=None,
             row_cluster=False, row_cluster_metric='euclidean',
             row_cluster_method='average', row_cluster_linkage=None,
             col_cluster=False, col_cluster_metric='euclidean',
             col_cluster_method='average', col_cluster_linkage=None,
-             **kwargs):
+            **kwargs):
     """
+    Plots a heatmap.
+
     Arguments:
-        map_type: One of 'zaric', 'standard', 'dendrograms'.
+        df: The dataframe to plot.
+        corr_types: Optionally specify correlation type using a dataframe of
+            CorrType enums for each entry (can be obtained from the corr
+            function). When specified, numeric correlations are plotted using
+            different markers.
+        map_type: One of 'zaric', 'standard', 'dendrograms':
+            * 'zaric' (default): a special heatmap, where magnitude is
+                indicated by size of the elements as well as their colour.
+            * 'standard': a standard heatmap plotted using sns.heatmap;
+            * 'dendrograms': a heatmap with dendrograms, using sns.clustermap.
+        ax: The matplotlib axis to use for the plotting (not supported for 
+            map_type 'dendrograms').
+        annot: Whether to also annotate the squares with numbers (defaults to
+            True for map_type 'standard' and 'dendrograms'; for 'zaric'
+            annotations are currently not displayed).
+        cbar: Whether to include a colorbar.
+        cbar_kws: Additional kwargs to use when plotting the colorbar.
+        mask: An array or a dataframe that indicates whether a value should
+            be masked out (True) or displayed (False).
+        row_cluster: Whether to use hierarchical clustering to reorder the rows.
+        row_cluster_metric: The metric to use for clustering the rows 
+            (see _DendrogramPlotter in seaborn.matrix).
+        row_cluster_method: The method to use for clustering the rows
+            (see _DendrogramPlotter in seaborn.matrix).
+        row_cluster_linkage: The linkage to use for clustering the rows
+            (see _DendrogramPlotter in seaborn.matrix).
+        col_cluster: Whether to use hierarchical clustering to reorder the cols.
+        col_cluster_metric: The metric to use for clustering the columns 
+            (see _DendrogramPlotter in seaborn.matrix).
+        col_cluster_method: The method to use for clustering the columns
+            (see _DendrogramPlotter in seaborn.matrix).
+        col_cluster_linkage: The linkage to use for clustering the columns
+            (see _DendrogramPlotter in seaborn.matrix).
+        square: Whether equal aspect ratio should be used for the axes or not
+            (defaults to True).
+        **kwargs: Any remaining kwargs are passed to the plotting function.
     """
     if map_type == 'dendrograms':
         if not ax is None:
@@ -353,6 +388,7 @@ def heatmap(df, corr_types=None, map_type='zaric', ax=None, face_color=None,
             ax=ax,
             face_color=face_color,
             cbar=cbar,
+            cbar_kws=cbar_kws,
             mask=m,
             x_order=df.columns,
             y_order=df.index,
@@ -376,9 +412,11 @@ def heatmap(df, corr_types=None, map_type='zaric', ax=None, face_color=None,
 
         if map_type == 'dendrograms':
             del kwargs['square']
-            sns.clustermap(df, cbar=cbar, mask=mask, **kwargs)
+            sns.clustermap(df, cbar=cbar, cbar_kws=cbar_kws,
+                           mask=mask, **kwargs)
         else:
-            sns.heatmap(df, ax=ax, cbar=cbar, mask=mask, **kwargs)
+            sns.heatmap(df, ax=ax, cbar=cbar, cbar_kws=cbar_kws,
+                        mask=mask, **kwargs)
         
         if ax is None: ax = plt.gcf().axes[2]
         ax.set_facecolor(face_color)
@@ -390,22 +428,65 @@ def heatmap(df, corr_types=None, map_type='zaric', ax=None, face_color=None,
         raise ValueError("Unknown map_type '{}'.".format(map_type))
 
 def _mask_corr_significance(mask, p, p_bound):
+    """
+    Adds True to the mask wherever p >= p_bound.
+    """
     mask = np.asarray(mask)
-    mask[np.where(mask >= p_bound)] = True
+    mask[np.where(p >= p_bound)] = True
 
 def _mask_diagonal(mask):
+    """
+    Sets the mask's diagonal to True.
+    """
     mask = np.asarray(mask)
     np.fill_diagonal(mask, True)
 
 def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
                  corr_method=None, nan_strategy='mask', nan_replace_value=0,
-                 mask_diagonal=True, p_bound=None, ax=None, map_type='zaric',
-                 annot=None, face_color=None, square=True, mask=None, **kwargs):
+                 sym_u=True, mask_diagonal=True, p_bound=None, ax=None,
+                 map_type='zaric', annot=None, face_color=None, square=True,
+                 mask=None, **kwargs):
+    """
+    Plots a correlation matrix using the heatmap function.
+
+    Returns r, p, ct, where r is the correlation matrix, p are its p-values and
+        ct are the correlation types (all computed by corr).
+
+    Arguments:
+        data_frame: The dataframe to plot correlations for.
+        categorical_inputs: Names of the columns that hold categorical inputs;
+            see more in the documentation of .corr.corr.
+        numeric_inputs: Names of the columns that hold numeric inputs;
+            see more in the documentation of .corr.corr.
+        corr_method: The correlation method to be passed to corr;
+            see more in the documentation of .corr.corr.
+        nan_strategy: Specifies how to handle NaNs; see more in the
+            documentation of .corr.corr.
+        nan_replace_value: The value to replace NaNs with; see more in the
+            documentation of .corr.corr.
+        sym_u: If True (default), the symmetric variant of the uncertainty 
+            coefficient is used instead of the basic asymmetric variant.
+        mask_diagonal: Whether to mask the diagonal of the matrix (defaults
+            to true as the diagonal is non-informative).
+        p_bound: The p-value bound. If specified, elements with greater
+            p-values are masked out.
+        ax: The matplotlib axis to use for the plotting (not supported for 
+            map_type 'dendrograms').
+        map_type: The type of heatmap to plot; see more in heatmap's docstring.
+        annot: Whether to also annotate the squares with numers; see more in
+            heatmap's docstring.
+        face_color: The heatmap's face color.
+        square: Whether equal aspect ratio should be used for the axes or not
+            (defaults to True).
+        mask: An array or a dataframe that indicates whether a value should
+            be masked out (True) or displayed (False).
+        **kwargs: Any remaining kwargs are passed to the heatmap function.
+    """
 
     r, p, ct = corr(data_frame, categorical_inputs=categorical_inputs,
                  numeric_inputs=numeric_inputs, corr_method=corr_method,
                  nan_strategy=nan_strategy, nan_replace_value=nan_replace_value,
-                 return_corr_types=True)
+                 sym_u=sym_u, return_corr_types=True)
 
     mask = np.zeros(r.shape) if mask is None else np.copy(mask)
     
@@ -417,7 +498,8 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
     
     heatmap(r, corr_types=ct, map_type=map_type, ax=ax, face_color=face_color,
             annot=annot, square=square, mask=mask, **kwargs)
-    return r
+
+    return r, p, ct
 
 class ColGrid:
     def __init__(self, data, x_cols, y_cols=None, col_wrap=None,
@@ -501,6 +583,12 @@ def infer_orient(x, y, orient=None):
         return "v"
 
 def sorted_order(func, by='median'):
+    """
+    Orders the elements in a boxplot or a violinplot.
+
+    Arguments:
+        by: What to order the elements by; 'median' is used by default.
+    """
     def wrapper(x=None, y=None, data=None, orient=None, *args, **kwargs):
         if not data is None:
             xx = data[x]
@@ -529,12 +617,27 @@ def sorted_order(func, by='median'):
     
     return wrapper
              
-def crosstab_plot(x, y, data=None, dropna=False, shownan=False, *args, **kwargs):
+def crosstab_plot(x, y, data=None, dropna=False, shownan=False, **kwargs):
+    """
+    Plots a crosstabulation of the different unique values from x and y,
+    displaying the counts of their co-occurences.
+
+    Arguments:
+        x: A column name (if data not None) or a Series object
+            (e.g. a dataframe column).
+        y: A column name (if data not None) or a Series object
+            (e.g. a dataframe column).
+        dropna: Whether to drop entries where at least one of x and y
+            is missing a value.
+        shownan: Whether to include NaN entries in the crosstabulation
+            or drop them before the dataframe is returned.
+        **kwargs: Any remaining kwargs are passed to the heatmap function.
+    """
     if not data is None:
         x = data[x]
         y = data[y]
     tab = numpy_crosstab(y, x, dropna=dropna, shownan=shownan)
-    heatmap(tab, *args, **kwargs)
+    heatmap(tab, **kwargs)
     return tab
 
 def _groupby_propplot(x, y):
@@ -542,7 +645,17 @@ def _groupby_propplot(x, y):
     propby = df.groupby(x.name)[y.name].mean()
     sns.barplot(propby.index, propby)
 
-def proportion_plot(df, x_col, prop_cols, show_titles=True):
+def proportion_plot(df, x_col, prop_cols):
+    """
+    Groups the dataframe by each of the prop_cols and plots the proportions
+    of x_col's values across each grouping using several bar plots.
+
+    Arguments:
+        df: The dataframe to plot.
+        x_col: Name of the categorical column to show proportions for.
+        prop_cols: A string or a list of strings specifying the column name(s)
+            of the columns to group by.
+    """
     scalar = False
     
     if isinstance(prop_cols, str):
@@ -567,6 +680,21 @@ def proportion_plot(df, x_col, prop_cols, show_titles=True):
 def imscatter(x, y, images, ax=None, zoom=1,
               frame_cmap=None, frame_c=None,
               frame_linewidth=1, **kwargs):
+    """
+    Creates a scatter plot, where images are plotted instead of points.
+
+    Arguments:
+        x: The horizontal positions of all the points.
+        y: The vertical positions of all the points.
+        images: An image for each of the points.
+        ax: The matplotlib axis to use for the plotting (not supported for 
+            map_type 'dendrograms').
+        zoom: The zoom of the OffsetImages when they are added to the plot.
+        frame_cmap: The colormap to use for the images' frames.
+        frame_c: The color(s) to use for the images' frames.
+        frame_linewidth: The linewidth of the images' frames.
+        **kwargs: Any remaining kwargs are passed to the OffsetImage function.
+    """
     if ax is None:
         ax = plt.gca()
         
