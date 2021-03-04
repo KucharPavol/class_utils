@@ -271,7 +271,7 @@ def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
     ax.add_collection(patch_col)
 
     if cbar:
-        plt.colorbar(patch_col, cax=cax, cmap=cmap, **cbar_kws)
+        plt.colorbar(patch_col, cax=cax, **cbar_kws)
 
 def heatmap(df, corr_types=None, map_type='zaric', ax=None, face_color=None,
             annot=None, cbar=True, cbar_kws=None, mask=None,
