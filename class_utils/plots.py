@@ -22,7 +22,10 @@ def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
                     with_output=True, 
                     with_mae=True, with_mse=False, 
                     error_color='tab:red', output_color='tab:blue',
-                    error_kwargs=dict(alpha=0.8), output_kwargs={},
+                    error_kwargs=dict(alpha=0.8, kde=True, linewidth=0,
+                                      kde_kws=dict(cut=3)),
+                    output_kwargs=dict(alpha=0.4, kde=True, linewidth=0,
+                                       kde_kws=dict(cut=3)),
                     mae_kwargs=dict(c='k', ls='--'),
                     mse_kwargs=dict(c='k', ls='--'),
                     standardize_outputs=True, ax=None,
@@ -56,15 +59,15 @@ def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
     ax2 = ax.twinx()
 
     if with_output:
-        sns.distplot(Y_true, label="desired output", ax=ax1, color=output_color,
-            hist_kws=output_kwargs)
+        sns.histplot(Y_true.flatten(), label="desired output", ax=ax1,
+                     color=output_color, **output_kwargs)
         ax1.set_xlabel('value')
         ax1.set_ylabel('output frequency', color=output_color)
         ax1.tick_params(axis='y', labelcolor=output_color)
 
     if with_error:
-        sns.distplot(error, label="error", color=error_color,
-            ax=ax2, hist_kws=error_kwargs)
+        sns.histplot(error.flatten(), label="error", color=error_color,
+            ax=ax2, **error_kwargs)
         ax2.set_ylabel('error frequency', color=error_color)
         ax2.tick_params(axis='y', labelcolor=error_color)
 
