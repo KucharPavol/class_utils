@@ -1,15 +1,16 @@
 import numpy as np
 
-def sliding_window(seq, win_size, step_size, writeable=False, batch_first=False):
+def sliding_window(seq, win_size, step_size=None, writeable=False, batch_first=False):
     """Cuts up a sequence into windows.
 
     Args:
         seq (numpy array): An array with dimensions (seq, feature dims), i.e.
             with the sequence dimension first and any other dimensions next.
         win_size (integer): The number of samples in the seq dimension per window. 
-        step_size (integer): The number of samples in the seq dimensions to
+        step_size (integer, optional): The number of samples in the seq dimensions to
             move after extracting a window. I.e. if step_size == win_size
-            there is no overlap between adjacent windows.
+            there is no overlap between adjacent windows. If None, defaults
+            to win_size.
         writeable (bool, optional): An argument passed to numpy's as_strided
             function: if you are going to modify the returned array, the data
             needs to be copied and you need to set writeable to True.
@@ -24,6 +25,7 @@ def sliding_window(seq, win_size, step_size, writeable=False, batch_first=False)
     """    
 
     seq_orig = seq
+    if step_size is None: step_size = win_size
     win_size_orig = win_size
     
     if len(seq_orig.shape) > 1:
