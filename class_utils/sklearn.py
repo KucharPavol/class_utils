@@ -119,6 +119,7 @@ class InvertibleColumnTransformer(BaseTransformerWrapper):
         # handle all except the remainder
         for tname, t, tcols in self.transformer.transformers_[:-1]:
             X_sel = X[:, self.transformer.output_indices_[tname]]
+            if X_sel.size == 0: continue
             X_sel_inv = t.inverse_transform(X_sel)
 
             for cname, col in zip(tcols, range(X_sel_inv.shape[1])):
