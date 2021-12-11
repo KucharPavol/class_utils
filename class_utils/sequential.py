@@ -1,6 +1,6 @@
 import numpy as np
 
-def sliding_window(seq, win_size, step_size=None, writeable=False, batch_first=False):
+def sliding_window(seq, win_size, step_size=None, writeable=False, batch_first=True):
     """Cuts up a sequence into windows.
 
     Args:
@@ -16,7 +16,7 @@ def sliding_window(seq, win_size, step_size=None, writeable=False, batch_first=F
             needs to be copied and you need to set writeable to True.
             Defaults to False.
         batch_first (bool, optional): Determines the shape of the returned
-            array. If False (default) the shape is (win_size, # of windows, feature dims).
+            array. If False, the shape is (win_size, # of windows, feature dims).
             If True, the shape is (# of windows, win_size, feature dims).
 
     Returns:
