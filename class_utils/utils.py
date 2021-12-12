@@ -34,31 +34,3 @@ def numpy_crosstab(x, y, dropna=False, shownan=False):
         cm_df = cm_df.drop(['nan'], axis=1, errors='ignore')
     
     return cm_df
-
-def make_montage(image_array, num_cols):
-    """
-    Returns a montage where the images from the image_array are placed
-    next to each other on a grid.
-
-    Args:
-        image_array: A 4D numpy image array (batch, width, height, channels);
-        num_cols: Number of columns in the montage
-    """
-    num_rows = int(np.ceil(image_array.shape[0] / num_cols))
-    pad = num_cols * num_rows - image_array.shape[0]
-
-    image_array = np.pad(
-        image_array,
-        (
-            (0, pad),
-            (0, 0),
-            (0, 0),
-            (0, 0)
-        )
-    )
-
-    image_array = image_array.reshape(num_rows, num_cols, *image_array.shape[1:])
-    a, b, m, n, c = image_array.shape
-    montage = image_array.transpose(0, 2, 1, 3, 4).reshape(a * m, b * n, c)
-
-    return montage

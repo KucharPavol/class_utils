@@ -6,8 +6,13 @@ try:
     from .plots import error_histogram, corr_heatmap, ColGrid, sorted_order
     from .plots import crosstab_plot, heatmap, proportion_plot
     from .plots import imscatter
-    from .utils import numpy_crosstab, make_montage
+    from .utils import numpy_crosstab
     from .corr import corr, CorrType
+except ModuleNotFoundError as err:
+    print("Warning:", err)
+
+try:
+    from .image_utils import plot_bboxes, make_montage
 except ModuleNotFoundError as err:
     print("Warning:", err)
 
