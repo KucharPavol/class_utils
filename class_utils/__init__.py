@@ -8,8 +8,13 @@ try:
     from .plots import imscatter
     from .utils import numpy_crosstab
     from .corr import corr, CorrType
-except ModuleNotFoundError:
-    pass
+except ModuleNotFoundError as err:
+    print("Warning:", err)
+
+try:
+    from .plots import half_violinplot, RainCloud
+except ModuleNotFoundError as err:
+    print("Warning:", err)
 
 try:
     from .explain import Explainer

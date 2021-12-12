@@ -17,6 +17,9 @@ import numbers
 import itertools
 import math
 
+# raincloud plots
+from ._from_ptitprince import half_violinplot, RainCloud
+
 def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
                     with_error=True, 
                     with_output=True, 
