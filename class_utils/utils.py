@@ -57,7 +57,7 @@ def make_montage(image_array, num_cols):
         )
     )
 
-    image_array = image_array.reshape(num_cols, num_rows, *image_array.shape[1:])
+    image_array = image_array.reshape(num_rows, num_cols, *image_array.shape[1:])
     a, b, m, n, c = image_array.shape
     montage = image_array.transpose(0, 2, 1, 3, 4).reshape(a * m, b * n, c)
 
