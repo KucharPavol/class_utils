@@ -97,6 +97,7 @@ class InvertibleColumnTransformer(BaseTransformerWrapper):
     def __init__(self,
         column_transformer: TransformerMixin,
         inverse_dropped: Optional[str] = 'nan',
+        return_dataframe: Optional[bool] = False,
     ):
         """A wrapper that adds inverse_transform to a ColumnTransformer.
             
@@ -105,6 +106,23 @@ class InvertibleColumnTransformer(BaseTransformerWrapper):
             
         super().__init__(transformer=column_transformer)
         self.__dict__['inverse_dropped'] = inverse_dropped
+        self.__dict__['return_dataframe'] = return_dataframe
+    
+    def transform(self, *args, **kwargs):
+        res = self.transformer.transform(*args, **kwargs)
+
+        if self.return_dataframe and not isinstance(res, pd.DataFrame):
+            res = pd.DataFrame(res, columns=self.get_feature_names_out())
+
+        return res
+
+    def fit_transform(self, *args, **kwargs):
+        res = self.transformer.fit_transform(*args, **kwargs)
+
+        if self.return_dataframe and not isinstance(res, pd.DataFrame):
+            res = pd.DataFrame(res, columns=self.get_feature_names_out())
+        
+        return res
     
     def inverse_transform(self, X):
         if hasattr(self.transformer, 'feature_names_in_'):
@@ -195,14 +213,17 @@ InvertibleColumnTransformer.__init__.__doc__ = (
     )
 )
 
-def make_invertible_column_transformer(*args, inverse_dropped='nan', **kwargs):
+def make_invertible_column_transformer(
+    *args, inverse_dropped='nan', return_dataframe=False, **kwargs
+):
     """Creates an InvertibleColumnTransformer.
 
     Args:{__invertible_column_transformer_args__}
     """
     return InvertibleColumnTransformer(
         make_column_transformer(*args, **kwargs),
-        inverse_dropped=inverse_dropped
+        inverse_dropped=inverse_dropped,
+        return_dataframe=return_dataframe
     )
 
 make_invertible_column_transformer.__doc__ = (
