@@ -213,7 +213,7 @@ InvertibleColumnTransformer.__init__.__doc__ = (
     )
 )
 
-def make_invertible_column_transformer(
+def make_ext_column_transformer(
     *args, inverse_dropped='nan', return_dataframe=False, **kwargs
 ):
     """Creates an InvertibleColumnTransformer.
@@ -226,11 +226,13 @@ def make_invertible_column_transformer(
         return_dataframe=return_dataframe
     )
 
-make_invertible_column_transformer.__doc__ = (
-    make_invertible_column_transformer.__doc__.format(
+make_ext_column_transformer.__doc__ = (
+    make_ext_column_transformer.__doc__.format(
         __invertible_column_transformer_args__=__invertible_column_transformer_args__
     )
 )
+
+make_invertible_column_transformer = make_ext_column_transformer
 
 def inverse(transformer, inverse='identity', inverse_dropped='nan'):
     """

@@ -22,6 +22,14 @@ except ModuleNotFoundError as err:
     print("Warning:", err)
 
 try:
+    from .sklearn import (
+        make_ext_column_transformer, InvertibleColumnTransformer,
+        TransformerExtensions
+    )
+except ModuleNotFoundError as err:
+    print("Warning:", err)
+
+try:
     from .explain import Explainer
 except ModuleNotFoundError:
     pass
