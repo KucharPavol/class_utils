@@ -155,7 +155,7 @@ def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
         size = np.ones(len(x))
 
     if size_norm is None:
-        size_norm = PowerNorm(0.5)
+        size_norm = PowerNorm(1.0)
     size_norm.autoscale_None(size)
 
     if cbar_kws is None:
@@ -163,7 +163,6 @@ def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
     
     if square:
         ax.set_aspect('equal')
-        plt.draw()
 
     if face_color is None:
         face_color = '#fdfdfd'
@@ -260,6 +259,9 @@ def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
                  start_doc[1] + cur_size[1] / 2),
                 cur_size[1] / 2, antialiased=True)
         else:
+            if square:
+                cur_size = (cur_size[0] + cur_size[1]) / 2
+                cur_size = (cur_size, cur_size)
             cur_rect = patches.Rectangle(
                 (start_doc[0], start_doc[1]),
                 cur_size[0], cur_size[1], antialiased=True)
