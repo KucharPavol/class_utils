@@ -682,7 +682,7 @@ def RainCloud(x = None, y = None, hue = None, data = None,
               orient = "v", width_viol = .5, width_box = .15,
               palette = None, bw = .2, linewidth = 1, cut = 0.,
               scale = "area", jitter = 1, move = 0., offset = None,
-              point_size = 3, ax = None, pointplot = False,
+              point_size = 5, ax = None, pointplot = False,
               alpha = None, dodge = True, linecolor = 'red', **kwargs ):
 
     '''Draw a Raincloud plot of measure `y` of different categories `x`. Here `x` and `y` different columns of the pandas dataframe `data`.
