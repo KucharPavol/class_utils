@@ -680,7 +680,7 @@ def half_violinplot(x=None, y=None, hue=None, data=None, order=None, hue_order=N
 def RainCloud(x = None, y = None, hue = None, data = None,
               order = None, hue_order = None,
               orient = "v", width_viol = .5, width_box = .15,
-              palette = "Set2", bw = .2, linewidth = 1, cut = 0.,
+              palette = None, bw = .2, linewidth = 1, cut = 0.,
               scale = "area", jitter = 1, move = 0., offset = None,
               point_size = 3, ax = None, pointplot = False,
               alpha = None, dodge = True, linecolor = 'red', **kwargs ):
