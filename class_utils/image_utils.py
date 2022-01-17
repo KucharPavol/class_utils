@@ -30,24 +30,31 @@ def make_montage(image_array, num_cols):
 
     return montage
 
-def plot_bboxes(img, bboxes, figsize=(10, 8)):
+def plot_bboxes(img, bboxes, scores=None, figsize=(10, 8)):
     if isinstance(img, np.ndarray):
         ar = img
     else:
         ar = np.array(img.convert(mode="RGB"))
+
+    if scores is None:
+        scores = np.ones(len(bboxes))
+    else:
+        if len(scores) != len(bboxes):
+            raise ValueError("Number of scores must match number of bboxes.")
     
     fig = plt.figure(figsize=figsize)
     ax = plt.gca()
     plt.imshow(ar)
     plt.axis("off")
 
-    for left, top, right, bottom in bboxes:
+    for (left, top, right, bottom), alpha in zip(bboxes, scores):
         box = patches.Rectangle(
             (left, top),
             width=right-left,
             height=bottom-top,
             linewidth=3, edgecolor='r',
-            facecolor='none'
+            facecolor='none',
+            alpha=alpha
         )
 
         ax.add_patch(box)
