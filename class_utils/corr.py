@@ -79,7 +79,7 @@ def _num_cat_select(df, categorical_inputs=None, numeric_inputs=None):
     else:
         numeric_inputs = set(numeric_inputs)
         
-    df_sel = df[categorical_inputs.union(numeric_inputs)]
+    df_sel = df[list(categorical_inputs.union(numeric_inputs))]
 
     return df_sel, categorical_inputs, numeric_inputs
 
