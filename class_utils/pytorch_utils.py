@@ -42,3 +42,19 @@ class EarlyStopping:
                 return True
                 
         return False
+
+class BestModelCheckpointer:
+    """
+    A convenience class that tracks the best validation loss and saves the
+    model every time it improves.
+    """
+    def __init__(self, checkpoint_path="best_model.pt"):
+        self.checkpoint_path = checkpoint_path
+        self.best_loss = torch.inf
+
+    def __call__(self, validation_loss, model=None):
+        if self.best_loss > validation_loss:
+            self.best_loss = validation_loss
+            
+            if not model is None and not self.checkpoint_path is None:
+                torch.save(model.state_dict(), self.checkpoint_path)
