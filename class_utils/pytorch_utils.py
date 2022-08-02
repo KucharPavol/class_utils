@@ -1,4 +1,5 @@
 import torch
+from collections import deque
 
 class EarlyStopping:
     """
@@ -58,3 +59,37 @@ class BestModelCheckpointer:
             
             if not model is None and not self.checkpoint_path is None:
                 torch.save(model.state_dict(), self.checkpoint_path)
+
+def freeze_except_last(model, freeze=True, num_last=None):
+    num_unfrozen = 0
+    q = deque()
+    q.extend(model.children())
+
+    if num_last is None:
+        if freeze: num_last = 1
+        else: num_last = 0
+
+    while len(q):
+        layer = q.pop()
+        num_children = 0
+
+        if hasattr(layer, "children"):
+            children = list(layer.children())
+            num_children = len(children)
+            q.extend(children)
+
+        if not num_children:
+            if num_unfrozen < num_last:
+                params = list(layer.parameters())
+
+                for param in params:
+                    param.requires_grad = freeze
+
+                if len(params):
+                    num_unfrozen += 1
+                    
+            else:
+                for param in layer.parameters():
+                    param.requires_grad = not freeze
+
+    return model
