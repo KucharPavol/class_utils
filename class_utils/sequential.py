@@ -1,5 +1,10 @@
 import numpy as np
 
+try:
+    from torch import Tensor
+except ImportError:
+    class Tensor: pass
+
 def sliding_window(seq, win_size, step_size=None, writeable=False, batch_first=True):
     """Cuts up a sequence into windows.
 
@@ -22,26 +27,29 @@ def sliding_window(seq, win_size, step_size=None, writeable=False, batch_first=T
     Returns:
         numpy array: Returns an array with windows extracted from the input seq.
             The shape of the returned array depends on batch_first.
-    """    
-
-    seq_orig = seq
+    """
     if step_size is None: step_size = win_size
-    win_size_orig = win_size
-    
-    if len(seq_orig.shape) > 1:
-        seq = seq.reshape(-1)
-        win_size *= np.product(seq_orig.shape[1:])
-        step_size *= np.product(seq_orig.shape[1:])
 
-    stride_inc = (step_size - 1) * seq.dtype.itemsize
-    stride, = seq.strides
+    if isinstance(seq, Tensor):
+        res = seq.unfold(0, win_size, step_size).swapaxes(1, 2)
+    else:
+        seq_orig = seq
+        win_size_orig = win_size
+        
+        if len(seq_orig.shape) > 1:
+            seq = seq.reshape(-1)
+            win_size *= np.product(seq_orig.shape[1:])
+            step_size *= np.product(seq_orig.shape[1:])
+            
+        stride_inc = (step_size - 1) * seq.dtype.itemsize
+        stride, = seq.strides
     
-    res = np.lib.stride_tricks.as_strided(seq,
-              [int((seq.shape[0] - win_size) / step_size + 1), win_size],
-              strides = (stride + stride_inc, stride), writeable=writeable)
+        res = np.lib.stride_tricks.as_strided(seq,
+                  [int((seq.shape[0] - win_size) / step_size + 1), win_size],
+                  strides = (stride + stride_inc, stride), writeable=writeable)
     
-    if len(seq_orig.shape) > 1:
-        res = res.reshape((res.shape[0], win_size_orig) + (seq_orig.shape[1:]))
+        if len(seq_orig.shape) > 1:
+            res = res.reshape((res.shape[0], win_size_orig) + (seq_orig.shape[1:]))
 
     if not batch_first:
         res = res.swapaxes(0, 1)
