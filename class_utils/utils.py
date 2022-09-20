@@ -27,7 +27,7 @@ def split_col_by_type(df):
 
     return categorical_inputs, numeric_inputs, textual_inputs, other_inputs
 
-def numpy_crosstab(x, y, dropna=False, shownan=False):
+def numpy_crosstab(x, y, dropna=False, shownan=False, normalize=None):
     """
     Gathers and crosstabulates different unique values from x and y, returning
     a dataframe with the count of their co-occurences.
@@ -39,6 +39,9 @@ def numpy_crosstab(x, y, dropna=False, shownan=False):
             is missing a value.
         shownan: Whether to include NaN entries in the crosstabulation
             or drop them before the dataframe is returned.
+        normalize: Whether to normalize the crosstabulation. Can be
+            'rows', 'columns' / 'cols' or False / None (default;
+            no normalization applied).
     """
     if dropna:
         ind = ~(x.isnull() | y.isnull())
@@ -58,5 +61,12 @@ def numpy_crosstab(x, y, dropna=False, shownan=False):
     if not shownan:
         cm_df = cm_df.drop(['nan'], axis=0, errors='ignore')
         cm_df = cm_df.drop(['nan'], axis=1, errors='ignore')
-    
+
+    if normalize == 'rows':
+        cm_df = cm_df.div(cm_df.sum(axis=1), axis=0)
+    elif normalize == 'columns' or normalize == 'cols':
+        cm_df = cm_df.div(cm_df.sum(axis=0), axis=1)
+    elif normalize is not None and normalize is not False:
+        raise ValueError("Unknown normalization method '{}'.".format(normalize))
+            
     return cm_df

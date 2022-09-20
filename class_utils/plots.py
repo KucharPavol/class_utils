@@ -663,7 +663,10 @@ def sorted_order(func, by='median'):
     
     return wrapper
              
-def crosstab_plot(x, y, data=None, dropna=False, shownan=False, **kwargs):
+def crosstab_plot(
+    x, y, data=None, dropna=False, shownan=False,
+    normalize=None, **kwargs
+):
     """
     Plots a crosstabulation of the different unique values from x and y,
     displaying the counts of their co-occurences.
@@ -677,12 +680,15 @@ def crosstab_plot(x, y, data=None, dropna=False, shownan=False, **kwargs):
             is missing a value.
         shownan: Whether to include NaN entries in the crosstabulation
             or drop them before the dataframe is returned.
+        normalize: Whether to normalize the crosstabulation. Can be
+            'rows', 'columns' or None (default; no normalization applied).
         **kwargs: Any remaining kwargs are passed to the heatmap function.
     """
     if not data is None:
         x = data[x]
         y = data[y]
-    tab = numpy_crosstab(y, x, dropna=dropna, shownan=shownan)
+    tab = numpy_crosstab(y, x, dropna=dropna,
+        shownan=shownan, normalize=normalize)
     heatmap(tab, **kwargs)
     return tab
 
