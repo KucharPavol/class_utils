@@ -155,7 +155,9 @@ def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
         size = np.ones(len(x))
 
     if size_norm is None:
-        size_norm = PowerNorm(1.0)
+        size_norm = PowerNorm(0.5)
+    elif isinstance(size_norm, numbers.Number):
+        size_norm = PowerNorm(size_norm)
     size_norm.autoscale_None(size)
 
     if cbar_kws is None:
