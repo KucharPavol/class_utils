@@ -23,8 +23,8 @@ except ModuleNotFoundError as err:
 
 try:
     from .sklearn import (
-        make_ext_column_transformer, InvertibleColumnTransformer,
-        TransformerExtensions
+        make_ext_column_transformer, transformer_extensions,
+        InvertibleColumnTransformer, TransformerExtensions
     )
 except ModuleNotFoundError as err:
     print("Warning:", err)
