@@ -1,5 +1,31 @@
 import numpy as np
 import pandas as pd
+from ._from_sv import determine_feature_type, FeatureType
+
+def split_col_by_type(df):
+    """
+    Splits columns into categorical, numeric, textual and other. Returns a tuple
+    of four lists, each containing the names of the columns of the respective
+    type.
+    """
+
+    categorical_inputs = []
+    numeric_inputs = []
+    textual_inputs = []
+    other_inputs = []
+
+    for col in df.columns:
+        ft = determine_feature_type(df[col])
+        if ft == FeatureType.TYPE_CAT or ft == FeatureType.TYPE_BOOL:
+            categorical_inputs.append(col)
+        elif ft == FeatureType.TYPE_NUM:
+            numeric_inputs.append(col)
+        elif ft == FeatureType.TYPE_TEXT:
+            textual_inputs.append(col)
+        else:
+            other_inputs.append(col)
+
+    return categorical_inputs, numeric_inputs, textual_inputs, other_inputs
 
 def numpy_crosstab(x, y, dropna=False, shownan=False):
     """

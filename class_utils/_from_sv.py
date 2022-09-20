@@ -166,3 +166,210 @@ def correlation_ratio(categories, measurements):
     else:
         eta = np.sqrt(numerator / denominator)
     return eta
+
+# The type detection code is from sweetviz.
+from enum import Enum, unique
+import configparser
+
+config = configparser.ConfigParser()
+config.read_string("""
+[Type_Detection]
+; Numeric columns will be considered CATEGORICAL if fewer than this many distinct
+max_numeric_distinct_to_be_categorical = 10
+
+; Text columns will be considered TEXT if more than this many distinct (CATEGORICAL otherwise)
+max_text_distinct_to_be_categorical = 101
+
+; Text columns will be considered TEXT if more than this fraction are distinct
+max_text_fraction_distinct_to_be_categorical = 0.33
+""")
+
+def get_counts(series: pd.Series) -> dict:
+    # The value_counts() function is used to get a Series containing counts of unique values.
+    value_counts_with_nan = series.value_counts(dropna=False)
+
+    # Fix for data with only a single value; reset_index was flipping the data returned
+    if len(value_counts_with_nan) == 1:
+        if pd.isna(value_counts_with_nan.index[0]):
+            value_counts_without_nan = pd.Series()
+        else:
+            value_counts_without_nan = value_counts_with_nan
+    else:
+        value_counts_without_nan = (value_counts_with_nan.reset_index().dropna().set_index("index").iloc[:, 0])
+    # print(value_counts_without_nan.index.dtype.name)
+
+    # IGNORING NAN FOR NOW AS IT CAUSES ISSUES [FIX]
+    # distinct_count_with_nan = value_counts_with_nan.count()
+
+    distinct_count_without_nan = value_counts_without_nan.count()
+    return {
+        "value_counts_without_nan": value_counts_without_nan,
+        "distinct_count_without_nan": distinct_count_without_nan,
+        "num_rows_with_data": series.count(),
+        "num_rows_total": len(series),
+        # IGNORING NAN FOR NOW AS IT CAUSES ISSUES [FIX]:
+        # "value_counts_with_nan": value_counts_with_nan,
+        # "distinct_count_with_nan": distinct_count_with_nan,
+    }
+
+@unique
+class FeatureType(Enum):
+    TYPE_CAT = "CATEGORICAL"
+    TYPE_BOOL = "BOOL"
+    TYPE_NUM = "NUMERIC"
+    TYPE_TEXT = "TEXT"
+    TYPE_UNSUPPORTED = "UNSUPPORTED"
+    TYPE_ALL_NAN = "ALL_NAN"
+    TYPE_UNKNOWN = "UNKNOWN"
+    TYPE_SKIPPED = "SKIPPED"
+    def __str__(self):
+        return "TYPE_" + str(self.value)
+
+def is_boolean(series: pd.Series, counts: dict) -> bool:
+    keys = counts["value_counts_without_nan"].keys()
+    if pd.api.types.is_bool_dtype(keys):
+        return True
+    elif (
+            1 <= counts["distinct_count_without_nan"] <= 2
+            and pd.api.types.is_numeric_dtype(series)
+            and series[~series.isnull()].between(0, 1).all()
+    ):
+        return True
+    elif 1 <= counts["distinct_count_without_nan"] <= 4:
+        unique_values = set([str(value).lower() for value in keys.values])
+        accepted_combinations = [
+            ["y", "n"],
+            ["yes", "no"],
+            ["true", "false"],
+            ["t", "f"],
+        ]
+
+        if len(unique_values) == 2 and any(
+                [unique_values == set(bools) for bools in
+                 accepted_combinations]
+        ):
+            return True
+    return False
+
+
+def is_categorical(series: pd.Series, counts: dict) -> bool:
+    keys = counts["value_counts_without_nan"].keys()
+    # TODO: CHECK THIS CASE ACTUALLY WORKS
+    if pd.api.types.is_categorical_dtype(keys):
+        return True
+    elif pd.api.types.is_numeric_dtype(series) and \
+            counts["distinct_count_without_nan"] \
+            <= config["Type_Detection"].getint("max_numeric_distinct_to_be_categorical"):
+        return True
+    else:
+        if counts["num_rows_with_data"] == 0:
+            return False
+        num_distinct = counts["distinct_count_without_nan"]
+        fraction_distinct = num_distinct / float(counts["num_rows_with_data"])
+        if fraction_distinct \
+             > config["Type_Detection"].getfloat("max_text_fraction_distinct_to_be_categorical"):
+            return False
+        if num_distinct <= config["Type_Detection"].getint("max_text_distinct_to_be_categorical"):
+            return True
+    return False
+
+
+def is_numeric(series: pd.Series, counts: dict) -> bool:
+    return pd.api.types.is_numeric_dtype(series) and \
+           counts["distinct_count_without_nan"] \
+           > config["Type_Detection"].getint("max_numeric_distinct_to_be_categorical")
+
+# For coercion, might need more testing!
+def could_be_numeric(series: pd.Series) -> bool:
+    return pd.api.types.is_numeric_dtype(series)
+
+def determine_feature_type(
+        series: pd.Series,
+        counts: dict = None,
+        must_be_this_type: FeatureType = FeatureType.TYPE_UNKNOWN,
+        which_dataframe: str = "DF"
+) -> object:
+    # Replace infinite values with NaNs to avoid issues with histograms
+    # TODO: INFINITE VALUE HANDLING/WARNING
+    # series.replace(to_replace=[np.inf, np.NINF, np.PINF], value=np.nan,
+    #                inplace=True)
+    
+    if counts is None:
+        counts = get_counts(series)
+
+    if counts["value_counts_without_nan"].index.inferred_type.startswith("mixed"):
+        raise TypeError(f"\n\nColumn [{series.name}] has a 'mixed' inferred_type (as determined by Pandas).\n"
+                        f"This is is not currently supported; column types should not contain mixed data.\n"
+                        f"e.g. only floats or strings, but not a combination.\n\n"
+                        f"POSSIBLE RESOLUTIONS:\n"
+                        f"BEST -> Make sure series [{series.name}] only contains a certain type of data (numerical OR string).\n"
+                        f"OR -> Convert series [{series.name}] to a string (if makes sense) so it will be picked up as CATEGORICAL or TEXT.\n"
+                        f"     One way to do this is:\n"
+                        f"     df['{series.name}'] = df['{series.name}'].astype(str)\n"
+                        f"OR -> Convert series [{series.name}] to a numerical value (if makes sense):\n"
+                        f"     One way to do this is:\n"
+                        f"     df['{series.name}'] = pd.to_numeric(df['{series.name}'], errors='coerce')\n"
+                        f"     # (errors='coerce' will transform string values to NaN, that can then be replaced if desired;"
+                        f" consult Pandas manual pages for more details)\n"
+                        )
+
+    try:
+        # TODO: must_be_this_type ENFORCING
+        if counts["distinct_count_without_nan"] == 0:
+            # Empty
+            var_type = FeatureType.TYPE_ALL_NAN
+            # var_type = FeatureType.TYPE_UNSUPPORTED
+        elif is_boolean(series, counts):
+            var_type = FeatureType.TYPE_BOOL
+        elif is_numeric(series, counts):
+            var_type = FeatureType.TYPE_NUM
+        elif is_categorical(series, counts):
+            var_type = FeatureType.TYPE_CAT
+        else:
+            var_type = FeatureType.TYPE_TEXT
+    except TypeError:
+        var_type = FeatureType.TYPE_UNSUPPORTED
+
+    # COERCE: only supporting the following for now:
+    # TEXT -> CAT
+    # CAT/BOOL -> TEXT
+    # CAT/BOOL -> NUM
+    # NUM -> CAT
+    # NUM -> TEXT
+    if must_be_this_type != FeatureType.TYPE_UNKNOWN and \
+                must_be_this_type != var_type and \
+                must_be_this_type != FeatureType.TYPE_ALL_NAN and \
+                var_type != FeatureType.TYPE_ALL_NAN:
+        if var_type == FeatureType.TYPE_TEXT and must_be_this_type == FeatureType.TYPE_CAT:
+            var_type = FeatureType.TYPE_CAT
+        elif (var_type == FeatureType.TYPE_CAT or var_type == FeatureType.TYPE_BOOL ) and \
+            must_be_this_type == FeatureType.TYPE_TEXT:
+            var_type = FeatureType.TYPE_TEXT
+        elif (var_type == FeatureType.TYPE_CAT or var_type == FeatureType.TYPE_BOOL) and \
+             must_be_this_type == FeatureType.TYPE_NUM:
+            # Trickiest: Coerce into numerical
+            if could_be_numeric(series):
+                var_type = FeatureType.TYPE_NUM
+            else:
+                raise TypeError(f"\n\nCannot force series '{series.name}' in {which_dataframe} to be converted from its {var_type} to\n"
+                                f"DESIRED type {must_be_this_type}. Check documentation for the possible coercion possibilities.\n"
+                                f"POSSIBLE RESOLUTIONS:\n"
+                                f" -> Use the feat_cfg parameter (see docs on git) to force the column to be a specific type (may or may not help depending on the type)\n"
+                                f" -> Modify the source data to be more explicitly of a single specific type\n"
+                                f" -> This could also be caused by a feature type mismatch between source and compare dataframes:\n"
+                                f"    In that case, make sure the source and compared dataframes are compatible.\n")
+        elif var_type == FeatureType.TYPE_NUM and must_be_this_type == FeatureType.TYPE_CAT:
+            var_type = FeatureType.TYPE_CAT
+        elif var_type == FeatureType.TYPE_BOOL and must_be_this_type == FeatureType.TYPE_CAT:
+            var_type = FeatureType.TYPE_CAT
+        elif var_type == FeatureType.TYPE_NUM and must_be_this_type == FeatureType.TYPE_TEXT:
+            var_type = FeatureType.TYPE_TEXT
+        else:
+            raise TypeError(f"\n\nCannot convert series '{series.name}' in {which_dataframe} from its {var_type}\n"
+                            f"to the desired type {must_be_this_type}.\nCheck documentation for the possible coercion possibilities.\n"
+                            f"POSSIBLE RESOLUTIONS:\n"
+                            f" -> Use the feat_cfg parameter (see docs on git) to force the column to be a specific type (may or may not help depending on the type)\n"
+                            f" -> Modify the source data to be more explicitly of a single specific type\n"
+                            f" -> This could also be caused by a feature type mismatch between source and compare dataframes:\n"
+                            f"    In that case, make sure the source and compared dataframes are compatible.\n")
+    return var_type

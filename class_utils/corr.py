@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from ._from_sv import theils_u, theils_sym_u, correlation_ratio
+from .utils import split_col_by_type
 from scipy.stats import pearsonr
 from itertools import combinations
 from enum import Enum
@@ -60,26 +61,39 @@ def _num_cat_select(df, categorical_inputs=None, numeric_inputs=None):
     Arguments:
         df: The dataframe.
         categorical_inputs: Names of the columns that hold numeric inputs.
-            Defaults to None, i.e. no categorical inputs.
+            Defaults to None, which is the same as categorical_inputs=[].
+            If 'auto', the columns are determined automatically using
+            split_col_by_type.
         numeric_inputs: Names of the columns that hold numeric inputs.
             Defaults to None, i.e. all columns with numeric data types
             should be used, except those listed in categorical_inputs.
+
+            If 'auto', the behaviour is the same as numeric_inputs=None.
+
             If numeric_inputs is not None and there are columns that are
             marked as neither categorical, nor numeric, they will be dropped.
             If a column is listed as both numeric and categorical, it
             is processed as numeric.
     """
     if categorical_inputs is None:
-        categorical_inputs = set()
-    else:
-        categorical_inputs = set(categorical_inputs)
-    
-    if numeric_inputs is None:
-        numeric_inputs = set(df.select_dtypes(np.number).columns) - categorical_inputs
-    else:
-        numeric_inputs = set(numeric_inputs)
+        categorical_inputs = []
+    elif categorical_inputs == 'auto':
+        categorical_inputs = None
+
+    if numeric_inputs is 'auto':
+        numeric_inputs = None
+
+    if categorical_inputs is None and numeric_inputs is None:
+        categorical_inputs, numeric_inputs, _, _ = split_col_by_type(df)
+    elif categorical_inputs is None:
+        tmp_cat, _, _, _ = split_col_by_type(df)
+        categorical_inputs = set(tmp_cat) - set(numeric_inputs)
+    elif numeric_inputs is None:
+        _, tmp_num, _, _ = split_col_by_type(df)
+        tmp_num = set(tmp_num) | set(df.select_dtypes(np.number).columns)
+        numeric_inputs = set(tmp_num) - set(categorical_inputs)
         
-    df_sel = df[df.columns.intersection(categorical_inputs | numeric_inputs)]
+    df_sel = df[df.columns.intersection(set(categorical_inputs) | set(numeric_inputs))]
     return df_sel, categorical_inputs, numeric_inputs
 
 class CorrType(Enum):
@@ -139,7 +153,8 @@ def corr(
         corr_method = pearsonr
 
     df_sel, categorical_inputs, numeric_inputs = _num_cat_select(
-        df, categorical_inputs, numeric_inputs)
+        df, categorical_inputs, numeric_inputs
+    )
     
     df_r = pd.DataFrame(np.ones([df_sel.shape[1], df_sel.shape[1]]), columns=df_sel.columns, index=df_sel.columns)
     df_p = pd.DataFrame(np.zeros([df_sel.shape[1], df_sel.shape[1]]), columns=df_sel.columns, index=df_sel.columns)
