@@ -118,7 +118,8 @@ def corr(
     A routine that computes associations between pairs of variables
     using a recipe derived from SweetViz:
     * Correlations for numeric vs. numeric;
-    * Uncertainty coefficient for categorical vs. categorical;
+    * Uncertainty coefficient for categorical vs. categorical,
+        i.e. Theil's U(row | column);
     * Correlation ratio for categorical vs. numeric.
     
     Returns two DataFrames: the first hold the association values and
