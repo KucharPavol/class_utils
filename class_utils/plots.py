@@ -452,7 +452,7 @@ def _mask_diagonal(mask):
 
 def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
                  corr_method=None, nan_strategy='mask', nan_replace_value=0,
-                 sym_u=True, mask_diagonal=True, p_bound=None, ax=None,
+                 sym_u=False, mask_diagonal=True, p_bound=None, ax=None,
                  map_type='zaric', annot=None, face_color=None, square=True,
                  mask=None, **kwargs):
     """
@@ -473,8 +473,9 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
             documentation of .corr.corr.
         nan_replace_value: The value to replace NaNs with; see more in the
             documentation of .corr.corr.
-        sym_u: If True (default), the symmetric variant of the uncertainty 
+        sym_u: If True, the symmetric variant of the uncertainty 
             coefficient is used instead of the basic asymmetric variant.
+            Defaults to False.
         mask_diagonal: Whether to mask the diagonal of the matrix (defaults
             to true as the diagonal is non-informative).
         p_bound: The p-value bound. If specified, elements with greater

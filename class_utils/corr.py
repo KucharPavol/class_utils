@@ -112,7 +112,7 @@ class CorrType(Enum):
 def corr(
     df, categorical_inputs=None, numeric_inputs=None,
     corr_method=None, nan_strategy='mask', nan_replace_value=0,
-    return_corr_types=False, sym_u=True
+    return_corr_types=False, sym_u=False
 ):
     """
     A routine that computes associations between pairs of variables
@@ -146,8 +146,9 @@ def corr(
         return_corr_types: Specifies whether to also return a correlation
             types dataframe. If true, a dataframe of CorrType values is
             returned as the third element of the return tuple.
-        sym_u: If True (default), the symmetric variant of the uncertainty 
+        sym_u: If True, the symmetric variant of the uncertainty 
             coefficient is used instead of the basic asymmetric variant.
+            Defaults to False.
     """
     if corr_method is None:
         corr_method = pearsonr
@@ -159,11 +160,6 @@ def corr(
     df_r = pd.DataFrame(np.ones([df_sel.shape[1], df_sel.shape[1]]), columns=df_sel.columns, index=df_sel.columns)
     df_p = pd.DataFrame(np.zeros([df_sel.shape[1], df_sel.shape[1]]), columns=df_sel.columns, index=df_sel.columns)
     df_ct = pd.DataFrame(np.zeros([df_sel.shape[1], df_sel.shape[1]]), columns=df_sel.columns, index=df_sel.columns)
-
-    if sym_u:
-        theil = theils_sym_u
-    else:
-        theil = theils_u
         
     for col1, col2 in combinations(df_sel.columns, 2):        
         if col1 in numeric_inputs:
@@ -223,8 +219,8 @@ def corr(
                     df_r.loc[col1, col2] = u
                     df_r.loc[col2, col1] = u
                 else:
-                    df_r.loc[col1, col2] = theils_sym_u(x, y)
-                    df_r.loc[col2, col1] = theils_sym_u(y, x)
+                    df_r.loc[col1, col2] = theils_u(x, y)
+                    df_r.loc[col2, col1] = theils_u(y, x)
 
                 df_p.loc[col1, col2] = 0.0
                 df_p.loc[col2, col1] = 0.0
