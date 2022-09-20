@@ -43,3 +43,8 @@ try:
     from .tensorboard import tflog2pandas
 except ModuleNotFoundError:
     pass
+
+try:
+    from .statsmodels import SMWrapper, SMLinearRegression
+except ModuleNotFoundError:
+    pass
