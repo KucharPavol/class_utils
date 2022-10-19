@@ -232,6 +232,33 @@ make_ext_column_transformer.__doc__ = (
     )
 )
 
+def make_pd_column_transformer(
+    *args, inverse_dropped='ignore', return_dataframe=True,
+    verbose_feature_names_out=False, **kwargs
+):
+    """Creates an InvertibleColumnTransformer with the following defaults:
+        * return_dataframe=True;
+        * inverse_dropped='nan';
+        * verbose_feature_names_out=False;
+
+    Args:{__invertible_column_transformer_args__}
+    """
+    return InvertibleColumnTransformer(
+        make_column_transformer(
+            *args,
+            verbose_feature_names_out=verbose_feature_names_out,
+            **kwargs
+        ),
+        inverse_dropped=inverse_dropped,
+        return_dataframe=return_dataframe
+    )
+
+make_pd_column_transformer.__doc__ = (
+    make_pd_column_transformer.__doc__.format(
+        __invertible_column_transformer_args__=__invertible_column_transformer_args__
+    )
+)
+
 make_invertible_column_transformer = make_ext_column_transformer
 
 def inverse(transformer, inverse='identity', inverse_dropped='nan'):
