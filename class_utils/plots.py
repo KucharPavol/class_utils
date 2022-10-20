@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from typing import Optional, Union
+from tsmoothie.smoother import _BaseSmoother, LowessSmoother
 import matplotlib.patches as patches
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.collections import PatchCollection
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import seaborn as sns
 import numpy as np
 from .corr import corr, CorrType
@@ -782,3 +785,210 @@ def imscatter(x, y, images, ax=None, zoom=1,
     ax.autoscale()
     
     return artists
+
+def smoothscatter(
+    x: Optional[Union[str, np.ndarray, pd.Series]] = None,
+    y: Optional[Union[str, np.ndarray, pd.Series]] = None,
+    data: Optional[Union[pd.DataFrame, pd.Series]] = None,
+    smoother: Optional[_BaseSmoother] = None,
+    scatter: bool = True,
+    smoothed: bool = True,
+    linreg: bool = False,
+    ci: Optional[int] = 95,
+    ci_linreg: Optional[int] = None,
+    dropna: bool =True,
+    x_jitter: Optional[float] = None,
+    y_jitter: Optional[float] = None,
+    label: Optional[str] = None,
+    label_smoothed: Optional[str] = None,
+    label_linreg: Optional[str] = None,
+    color=None,
+    alpha: float = 0.8,
+    marker='o',
+    scatter_kws: Optional[dict] = None,
+    smoothed_kws: Optional[dict] = None,
+    linreg_kws: Optional[dict] = None,
+    ax=None,
+    linewidth: float = 2,
+    smooth_fraction: float = 0.5,
+    smooth_iterations: float = 1,
+    interval_type: str = 'confidence_interval',
+):
+    """
+    Plots a scatter plot of x and y, with an optional smoothed line.
+
+    Arguments:
+        x (Union[str, np.ndarray, pd.Series], optional): The horizontal
+            positions of the points. If a string is passed, it is
+            interpreted as the name of a column in the data dataframe. If None
+            is passed, the index of the dataframe is used.
+        y (Union[str, np.ndarray, pd.Series], optional): The vertical
+            positions of the points. If a string is passed, it is interpreted
+            as the name of a column in the dataframe. If None is passed, the
+            data dataframe is expected to be a pd.Series or to have a single
+            column, which is used as y.
+        data (Union[pd.DataFrame, pd.Series], optional): A dataframe to use
+            for x and y. If x and y are not passed, this dataframe is used
+            for both.
+        smoother (tsmoothie.smoother._BaseSmoother, optional): A tsmoothie
+            smoother to use for the smoothed line.
+        scatter (bool): Whether to plot the scatter plot.
+        smoothed (bool): Whether to plot the smoothed line.
+        linreg (bool): Whether to also plot a linear regression line.
+        ci (int, optional): The confidence interval to use for the smoothed
+            line. If None, no confidence interval is plotted.
+        ci_linreg (int, optional): The confidence interval used for the
+            linear regression. If None (default), no confidence interval is
+            plotted.
+        dropna (bool): Whether to drop entries where at least one of x and y
+            is missing a value.
+        x_jitter (float, optional): The amount of jitter to apply to the x
+            values. If None, no jitter is applied.
+        y_jitter (float, optional): The amount of jitter to apply to the y
+            values. If None, no jitter is applied.
+        label (str, optional): The label to use for the plot. If a scatter plot
+            is plotted, then the label is used for it. If not, it is used for
+            the smoothed line.
+        label_smoothed: The label to use for the smoothed line. (Overrides
+            label if both are passed, even when the scatter plot is off.)
+        label_linreg: The label to use for the linear regression line.
+        color: The color to use for the plots.
+        alpha: The alpha to use for the scatter plot.
+        marker: The marker to use for the scatter plot.
+        scatter_kws (dict, optional): Any kwargs to pass to the scatter plot.
+            Arguments specified in this dict override the other arguments.
+        smoothed_kws (dict, optional): Any kwargs to pass to the smoothed line.
+            Arguments specified in this dict override the other arguments.
+        linreg_kws (dict, optional): Any kwargs to pass to the linear
+            regression line plot (created using seaborn's regplot).
+        ax: The matplotlib axis to use for the plotting.
+        linewidth (float): The linewidth of the smoothed line.
+        smooth_fraction (float): The fraction of the data to use for the
+            smoothed line. This is only used if smoother is None, i.e. if a
+            default Lowess smoother is constructed.
+        smooth_iterations (float): The number of iterations to use for the
+            smoothed line. This is only used if smoother is None, i.e. if a
+            default Lowess smoother is constructed.
+        interval_type (str): The type of interval to use for the smoothed line.
+            The supported options depend on the smoother. For the default
+            Lowess smoother, the supported options are 'confidence_interval',
+            'prediction_interval' and 'sigma_interval'.
+    
+    Returns:
+        The matplotlib axis used for the plotting.
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    if color is None:
+        lines, = ax.plot([], [])
+        color = lines.get_color()
+        lines.remove()
+
+    color = mpl.colors.rgb2hex(mpl.colors.colorConverter.to_rgb(color))
+
+    if (
+        ((x is None) or isinstance(x, str)) or
+        ((y is None) or isinstance(y, str))
+     ) and data is None:
+        raise ValueError("The function needs some data to plot")
+
+    if scatter_kws is None:
+        scatter_kws = {}
+
+    if smoothed_kws is None:
+        smoothed_kws = {}
+
+    if linreg_kws is None:
+        linreg_kws = {}
+    else:
+        linreg_kws = linreg_kws.copy()
+    
+    linreg_kws.setdefault('scatter', False)
+    linreg_kws.setdefault('color', 'k')
+    linreg_kws.setdefault('ci', ci_linreg)
+    linreg_kws.setdefault('label', label_linreg)
+    
+    line_kws = linreg_kws.pop('line_kws', {}).copy()
+    line_kws.setdefault('linewidth', 2)
+    linreg_kws['line_kws'] = line_kws
+
+    if x is None:
+        x = data.index
+
+    if y is None:
+        if isinstance(data, pd.Series):
+            y = data.values
+        elif data.shape[1] == 1:
+            y = data.iloc[:, 0]
+        else:
+            raise ValueError("When y is None, the data dataframe is expected to have a single column.")
+
+    if isinstance(x, str):
+        x = data[x]
+    elif isinstance(x, pd.Series):
+        x = x.values
+
+    if isinstance(y, str):
+        y = data[y]
+    elif isinstance(y, pd.Series):
+        y = y.values
+
+    if dropna:
+        not_na = pd.notna(x) & pd.notna(y)
+        x = x[not_na]
+        y = y[not_na]
+
+    sort_index = x.argsort()
+    y_sort = y[sort_index]
+
+    if smoother is None:
+        smoother = LowessSmoother(
+            smooth_fraction=smooth_fraction,
+            iterations=smooth_iterations
+        )
+
+    smoother.smooth(y_sort)
+
+    if not ci is None:
+        low, up = smoother.get_intervals(interval_type, confidence = 1-ci/100)
+
+    if scatter:
+        if x_jitter is not None:
+            x_jit = x + np.random.normal(0, x_jitter, len(x))
+        else:
+            x_jit = x
+
+        if y_jitter is not None:
+            y_jit = y + np.random.normal(0, y_jitter, len(y))
+        else:
+            y_jit = y
+
+        scatter_color = scatter_kws.pop('color', color)
+        scatter_alpha = scatter_kws.pop('alpha', alpha)
+
+        ax.scatter(
+            x_jit, y_jit, label=label, color=scatter_color, marker=marker,
+            alpha=scatter_alpha, **scatter_kws
+        )
+
+        label = None
+
+    if smoothed:
+        smoothed_color = smoothed_kws.pop('color', color)
+        linewidth = smoothed_kws.pop('linewidth', linewidth)
+        if label_smoothed is None: label_smoothed = label
+        label_smoothed = smoothed_kws.pop('label', label_smoothed)
+       
+        plt.plot(
+            x[sort_index], smoother.smooth_data[0], color=smoothed_color,
+            linewidth=linewidth, label=label_smoothed, **smoothed_kws
+        )
+
+        if not ci is None:
+            plt.fill_between(x[sort_index], low[0], up[0], alpha = 0.3)
+
+    if linreg:
+        sns.regplot(x=x, y=y, ax=ax, **linreg_kws)
+
+    return ax
