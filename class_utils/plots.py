@@ -808,6 +808,7 @@ def smoothscatter(
     scatter_kws: Optional[dict] = None,
     smoothed_kws: Optional[dict] = None,
     linreg_kws: Optional[dict] = None,
+    ci_kws: Optional[dict] = None,
     ax=None,
     linewidth: float = 2,
     smooth_fraction: float = 0.5,
@@ -861,6 +862,8 @@ def smoothscatter(
             Arguments specified in this dict override the other arguments.
         linreg_kws (dict, optional): Any kwargs to pass to the linear
             regression line plot (created using seaborn's regplot).
+        ci_kws (dict, optional): Any kwargs to pass to the confidence interval
+            plot.
         ax: The matplotlib axis to use for the plotting.
         linewidth (float): The linewidth of the smoothed line.
         smooth_fraction (float): The fraction of the data to use for the
@@ -903,6 +906,11 @@ def smoothscatter(
         linreg_kws = {}
     else:
         linreg_kws = linreg_kws.copy()
+
+    if ci_kws is None:
+        ci_kws = {}
+    else:
+        ci_kws = ci_kws.copy()
     
     linreg_kws.setdefault('scatter', False)
     linreg_kws.setdefault('color', 'k')
@@ -980,13 +988,15 @@ def smoothscatter(
         if label_smoothed is None: label_smoothed = label
         label_smoothed = smoothed_kws.pop('label', label_smoothed)
        
-        plt.plot(
+        ax.plot(
             x[sort_index], smoother.smooth_data[0], color=smoothed_color,
             linewidth=linewidth, label=label_smoothed, **smoothed_kws
         )
-
+        
         if not ci is None:
-            plt.fill_between(x[sort_index], low[0], up[0], alpha = 0.3)
+            ci_kws.setdefault('color', smoothed_color)
+            ci_kws.setdefault('alpha', 0.3)
+            ax.fill_between(x[sort_index], low[0], up[0], **ci_kws)
 
     if linreg:
         sns.regplot(x=x, y=y, ax=ax, **linreg_kws)
