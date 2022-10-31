@@ -46,6 +46,6 @@ except ModuleNotFoundError:
     pass
 
 try:
-    from .statsmodels import SMWrapper, SMLinearRegression
+    from .statsmodels import SMWrapper, SMLinearRegression, SMLogisticRegression
 except ModuleNotFoundError:
     pass
