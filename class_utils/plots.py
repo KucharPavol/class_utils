@@ -142,14 +142,15 @@ def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
             x_order=None, y_order=None, circular=None,
             ax=None, face_color=None, wrap_x=12, wrap_y=13, square=True,
             cbar=True, cax=None, cbar_kws=None, mask=None,
-            color_norm=None, size_norm=None):
+            color_norm=None, size_norm=None, annot=False, annot_kws=None,
+            fmt=".2g", scale_color_norm=True):
     if ax is None:
         ax = plt.gca()
 
     if color_norm is None:
         color_norm = PowerNorm(0.925)
     
-    if not color_norm.scaled():
+    if scale_color_norm and not color_norm.scaled():
         vmax = max(np.abs(np.nanmin(color)), np.abs(np.nanmax(color)))
         vmin = -vmax
         color_norm.autoscale([vmin, vmax])
@@ -225,6 +226,14 @@ def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
     patch_col = []
     patch_col_ind = []
 
+    if annot_kws is None:
+        annot_kws = {}
+    else:
+        annot_kws = annot_kws.copy()
+        
+    annot_kws.setdefault("fontsize", 11)
+    annot_kws.setdefault("color", "black")
+
     for cur_x, cur_y, use_circ in zip(x, y, circular):
         if (size[index] == 0 or
             np.isnan(color[index]) or
@@ -271,6 +280,14 @@ def _zaric_heatmap(y, x, color=None, cmap=None, palette='coolwarm', size=None,
                 (start_doc[0], start_doc[1]),
                 cur_size[0], cur_size[1], antialiased=True)
 
+        if annot:
+            # annotate the cell with the numeric value
+            ax.text(start_doc[0] + cur_size[0] / 2,
+                    start_doc[1] + cur_size[1] / 2,
+                    ("{:" + fmt + "}").format(color[index]),
+                    va='center', ha='center',
+                    **annot_kws)
+                    
         cur_rect.set_antialiased(True)
         patch_col.append(cur_rect)
         patch_col_ind.append(index)
@@ -310,8 +327,8 @@ def heatmap(df, corr_types=None, map_type='zaric', ax=None, face_color=None,
         ax: The matplotlib axis to use for the plotting (not supported for 
             map_type 'dendrograms').
         annot: Whether to also annotate the squares with numbers (defaults to
-            True for map_type 'standard' and 'dendrograms'; for 'zaric'
-            annotations are currently not displayed).
+            True for map_type 'standard' and 'dendrograms'; and to 'False' for
+            'zaric').
         cbar: Whether to include a colorbar.
         cbar_kws: Additional kwargs to use when plotting the colorbar.
         mask: An array or a dataframe that indicates whether a value should
@@ -378,6 +395,9 @@ def heatmap(df, corr_types=None, map_type='zaric', ax=None, face_color=None,
             corr_types = corr_types[:, col_ind]
 
     if map_type == "zaric":
+        if annot is None:
+            annot = False
+
         l = np.asarray(list(itertools.product(df.index, df.columns)))
         x = l[:, 0]
         y = l[:, 1]
@@ -404,6 +424,7 @@ def heatmap(df, corr_types=None, map_type='zaric', ax=None, face_color=None,
             mask=m,
             x_order=df.columns,
             y_order=df.index,
+            annot=annot,
             **kwargs
         )
 
@@ -485,7 +506,11 @@ def corr_heatmap(data_frame, categorical_inputs=None, numeric_inputs=None,
             p-values are masked out.
         ax: The matplotlib axis to use for the plotting (not supported for 
             map_type 'dendrograms').
-        map_type: The type of heatmap to plot; see more in heatmap's docstring.
+        map_type:  map_type: One of 'zaric', 'standard', 'dendrograms':
+            * 'zaric' (default): a special heatmap, where magnitude is
+                indicated by size of the elements as well as their colour.
+            * 'standard': a standard heatmap plotted using sns.heatmap;
+            * 'dendrograms': a heatmap with dendrograms, using sns.clustermap.
         annot: Whether to also annotate the squares with numers; see more in
             heatmap's docstring.
         face_color: The heatmap's face color.
