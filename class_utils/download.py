@@ -189,12 +189,17 @@ def _check_download(*filepaths):
     return all([os.path.isfile(filepath) for filepath in filepaths])
 
 
-def download_files_maybe_extract(urls, directory, check_files='auto'):
+def download_files_maybe_extract(urls, directory, filename_tpl=None, check_files='auto'):
     """ Download the files at ``urls`` to ``directory``. Extract to ``directory`` if tar or zip.
 
     Args:
         urls (str): Url of files.
         directory (str): Directory to download to.
+        filename_tpl (str, optional): Template for the filenames of the
+            downloaded files. If None, the filenames are extracted from the
+            urls. The template string is to contain an {ifile} placeholder:
+            this will be replaced by the index of the file in the list of
+            urls.
         check_files (list of str): Check if these files exist, ensuring the download succeeded.
             If these files exist before the download, the download is skipped.
 
@@ -206,9 +211,16 @@ def download_files_maybe_extract(urls, directory, check_files='auto'):
         if _check_download(*check_files):
             return
 
-    for url in urls:
-        download_file_maybe_extract(url=url, directory=directory,
-            check_files=[] if check_files != 'auto' else 'auto')
+    for ifile, url in enumerate(urls):
+        if not filename_tpl is None:
+            filename = filename_tpl.format(ifile=ifile)
+        else:
+            filename = None
+
+        download_file_maybe_extract(
+            url=url, directory=directory, filename=filename,
+            check_files=[] if check_files != 'auto' else 'auto'
+        )
 
     if check_files != 'auto' and not _check_download(*check_files):
         raise ValueError('[DOWNLOAD FAILED] `*check_files` not found')
