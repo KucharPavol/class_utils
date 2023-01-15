@@ -121,14 +121,18 @@ def _get_filename_from_url(url):
     return os.path.basename(parse.path)
 
 
-def download_file_maybe_extract(url, directory, filename=None, extension=None, check_files='auto'):
+def download_file_maybe_extract(
+    url, directory, filename=None, extension=None, check_files='auto',
+    filename_subs=None, fallback_ext='ext'
+):
     """ Download the file at ``url`` to ``directory``. Extract to ``directory`` if tar or zip.
 
     Args:
         url (str or Path): Url of file.
         directory (str): Directory to download to.
         filename (str, optional): Name of the file to download; Otherwise, a filename is extracted
-            from the url.
+            from the url. '{ext}' is a placeholder that will be automatically replaced with 
+            the extension extracted from the original filename.
         extension (str, optional): Extension of the file; Otherwise, attempts to extract extension
             from the filename.
         check_files (list of str or Path): Check if these files exist, ensuring the download
@@ -142,6 +146,16 @@ def download_file_maybe_extract(url, directory, filename=None, extension=None, c
     """
     if filename is None:
         filename = _get_filename_from_url(url)
+    else:
+        if filename_subs is None:
+            filename_subs = {}
+       
+        ext = os.path.splitext(_get_filename_from_url(url))[1][1:]
+        
+        if not str(ext.strip()):
+            ext = fallback_ext
+        
+        filename = filename.format(ext=ext, **filename_subs)
 
     directory = str(directory)
     filepath = os.path.join(directory, filename)
@@ -176,7 +190,6 @@ def download_file_maybe_extract(url, directory, filename=None, extension=None, c
     return filepath
 
 
-
 def _check_download(*filepaths):
     """ Check if the downloaded files are found.
 
@@ -189,7 +202,9 @@ def _check_download(*filepaths):
     return all([os.path.isfile(filepath) for filepath in filepaths])
 
 
-def download_files_maybe_extract(urls, directory, filename_tpl=None, check_files='auto'):
+def download_files_maybe_extract(
+    urls, directory, filename_tpl=None, check_files='auto', fallback_ext='ext'
+):
     """ Download the files at ``urls`` to ``directory``. Extract to ``directory`` if tar or zip.
 
     Args:
@@ -199,9 +214,14 @@ def download_files_maybe_extract(urls, directory, filename_tpl=None, check_files
             downloaded files. If None, the filenames are extracted from the
             urls. The template string is to contain an {ifile} placeholder:
             this will be replaced by the index of the file in the list of
-            urls.
+            urls. It can also optionally contain a {ext} placeholder, which,
+            if present, will be replaced by the extension extracted from the
+            original filename.
         check_files (list of str): Check if these files exist, ensuring the download succeeded.
             If these files exist before the download, the download is skipped.
+
+    Returns:
+        (list of str): Filenames of downloaded files.
 
     Raises:
         ValueError: Error if one of the ``check_files`` are not found following the download.
@@ -211,16 +231,23 @@ def download_files_maybe_extract(urls, directory, filename_tpl=None, check_files
         if _check_download(*check_files):
             return
 
+    filenames = []
+
     for ifile, url in enumerate(urls):
         if not filename_tpl is None:
-            filename = filename_tpl.format(ifile=ifile)
-        else:
-            filename = None
+            filename = filename_tpl
+            filename_subs = {'ifile': ifile}
+        else: filename = None
 
-        download_file_maybe_extract(
-            url=url, directory=directory, filename=filename,
-            check_files=[] if check_files != 'auto' else 'auto'
+        filenames.append(
+            download_file_maybe_extract(
+                url=url, directory=directory, filename=filename,
+                check_files=[] if check_files != 'auto' else 'auto',
+                filename_subs=filename_subs, fallback_ext=fallback_ext
+            )
         )
 
     if check_files != 'auto' and not _check_download(*check_files):
         raise ValueError('[DOWNLOAD FAILED] `*check_files` not found')
+
+    return filenames
