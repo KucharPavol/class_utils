@@ -10,15 +10,21 @@ try:
     from .corr import corr, CorrType
 except ModuleNotFoundError as err:
     print("Warning:", err)
+except ImportError as err:
+    print("Warning:", err)
 
 try:
     from .image_utils import plot_bboxes, make_montage
 except ModuleNotFoundError as err:
     print("Warning:", err)
+except ImportError as err:
+    print("Warning:", err)
 
 try:
     from .plots import half_violinplot, RainCloud
 except ModuleNotFoundError as err:
+    print("Warning:", err)
+except ImportError as err:
     print("Warning:", err)
 
 try:
@@ -28,6 +34,8 @@ try:
         make_pd_column_transformer
     )
 except ModuleNotFoundError as err:
+    print("Warning:", err)
+except ImportError as err:
     print("Warning:", err)
 
 try:
