@@ -21,7 +21,10 @@ import itertools
 import math
 
 # raincloud plots
-from ._from_ptitprince import half_violinplot, RainCloud
+if sns.__version__ < "0.12.0":
+    from ._from_ptitprince import half_violinplot, RainCloud
+else:
+    from ._from_ptitprince_012 import half_violinplot, RainCloud
 
 def error_histogram(Y_true, Y_predicted, Y_fit_scaling=None,
                     with_error=True, 
