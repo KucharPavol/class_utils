@@ -237,7 +237,9 @@ def download_files_maybe_extract(
         if not filename_tpl is None:
             filename = filename_tpl
             filename_subs = {'ifile': ifile}
-        else: filename = None
+        else:
+            filename = None
+            filename_subs = {}
 
         filenames.append(
             download_file_maybe_extract(
