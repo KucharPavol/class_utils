@@ -20,6 +20,14 @@ import numbers
 import itertools
 import math
 
+# Portions of this file (_zaric_heatmap) contain code
+# from the following repository:
+# https://github.com/fbdesignpro/sweetviz
+# and by extension, also the following repository:
+# https://github.com/dylan-profiler/heatmaps
+#
+# The code is licensed under the MIT and the BSD licenses respectively.
+
 # raincloud plots
 if sns.__version__ < "0.12.0":
     from ._from_ptitprince import half_violinplot, RainCloud
